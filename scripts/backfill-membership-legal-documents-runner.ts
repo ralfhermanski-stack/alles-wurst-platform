@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const positions = await prisma.accountingPosition.findMany({
     where: {
       productType: "membership",
-      paymentStatus: { in: ["paid", "completed"] },
+      paymentStatus: "paid",
       checkoutIntentId: { not: null },
     },
     include: {
