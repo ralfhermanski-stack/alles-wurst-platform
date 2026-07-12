@@ -1,0 +1,60 @@
+{
+  "course": {
+    "title": "Grundlagen der Wurstherstellung",
+    "slug": "grundlagen-wurstherstellung",
+    "subtitle": "Dein Einstieg ins Handwerk",
+    "description": "In diesem Minikurs lernst du die wichtigsten Grundlagen der Wurstherstellung — von der Fleischauswahl bis zur richtigen Würzung.",
+    "learningGoals": [
+      "Fleischsorten und Fettanteile verstehen",
+      "Grundwürzung sicher anwenden",
+      "Erste eigene Wurst herstellen"
+    ],
+    "courseType": "minikurs",
+    "certificateType": "participation",
+    "estimatedMinutes": 45
+  },
+  "modules": [
+    {
+      "title": "Einstieg",
+      "description": "Grundlagen und Überblick",
+      "sortOrder": 10,
+      "lessons": [
+        {
+          "title": "Willkommen im Kurs",
+          "slug": "willkommen",
+          "lessonType": "text",
+          "sortOrder": 10,
+          "textContent": "Herzlich willkommen bei Alles-Wurst! In diesem Kurs führst du Schritt für Schritt in die Grundlagen der Wurstherstellung ein."
+        },
+        {
+          "title": "Fleisch und Fett — die Basis",
+          "slug": "fleisch-und-fett",
+          "lessonType": "video",
+          "sortOrder": 20,
+          "durationMinutes": 12,
+          "vimeoVideoId": "123456789"
+        }
+      ]
+    },
+    {
+      "title": "Praxis",
+      "description": "Anwendung im Alltag",
+      "sortOrder": 20,
+      "lessons": [
+        {
+          "title": "Checkliste für den Einstieg",
+          "slug": "checkliste",
+          "lessonType": "download",
+          "sortOrder": 10
+        },
+        {
+          "title": "Einfaches Bratwurst-Rezept",
+          "slug": "bratwurst-rezept",
+          "lessonType": "recipe",
+          "sortOrder": 20,
+          "recipeTitle": "Klassisches Bratwurst-Rezept"
+        }
+      ]
+    }
+  ]
+}

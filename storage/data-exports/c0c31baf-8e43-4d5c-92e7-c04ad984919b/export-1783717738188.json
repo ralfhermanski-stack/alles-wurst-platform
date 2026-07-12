@@ -1,0 +1,76 @@
+{
+  "exportedAt": "2026-07-10T21:08:58.188Z",
+  "account": {
+    "email": "ralf.hermanski@alles-wurst.de",
+    "createdAt": "2026-07-08T17:50:02.349Z",
+    "profile": {
+      "id": "96db4730-2ced-45b8-a3ac-e237aaf1042e",
+      "userId": "c0c31baf-8e43-4d5c-92e7-c04ad984919b",
+      "salutation": null,
+      "publicName": null,
+      "avatarUrl": null,
+      "avatarStorageKey": null,
+      "avatarFileName": null,
+      "bio": null,
+      "firstName": "Ralf",
+      "lastName": "Hermanski",
+      "company": null,
+      "street": "—",
+      "houseNumber": "—",
+      "addressLine2": null,
+      "postalCode": "00000",
+      "city": "—",
+      "stateRegion": null,
+      "country": "DE",
+      "phone": null,
+      "createdAt": "2026-07-08T17:50:02.349Z",
+      "updatedAt": "2026-07-08T17:50:02.349Z"
+    },
+    "membership": {
+      "id": "87dccea1-e4d3-4712-8ac4-9095316b814d",
+      "userId": "c0c31baf-8e43-4d5c-92e7-c04ad984919b",
+      "role": "registered",
+      "status": "none",
+      "paymentStatus": "none",
+      "paymentNote": null,
+      "accountingNote": null,
+      "accessBlocked": false,
+      "blockReason": null,
+      "startedAt": null,
+      "endsAt": null,
+      "extendedUntil": null,
+      "createdAt": "2026-07-08T17:50:02.349Z",
+      "updatedAt": "2026-07-08T17:50:02.349Z"
+    }
+  },
+  "orders": [],
+  "courses": [],
+  "tickets": [
+    {
+      "ticketNumber": "AW-T-2026-000001",
+      "subject": "du hast ein Ticket",
+      "status": "open",
+      "createdAt": "2026-07-08T22:46:45.563Z"
+    },
+    {
+      "ticketNumber": "AW-T-2026-000002",
+      "subject": "lol",
+      "status": "open",
+      "createdAt": "2026-07-08T22:47:15.588Z"
+    },
+    {
+      "ticketNumber": "AW-T-2026-000003",
+      "subject": "hahaha",
+      "status": "open",
+      "createdAt": "2026-07-08T22:47:43.013Z"
+    }
+  ],
+  "privacyRequests": [
+    {
+      "requestNumber": "EXP-20260710-4CEB1D",
+      "type": "EXPORT",
+      "status": "REQUESTED",
+      "createdAt": "2026-07-10T21:08:58.147Z"
+    }
+  ]
+}

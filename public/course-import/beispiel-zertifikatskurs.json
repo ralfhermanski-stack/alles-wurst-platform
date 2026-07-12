@@ -1,0 +1,69 @@
+{
+  "course": {
+    "title": "Wurst-Meisterkurs mit Zertifikat",
+    "slug": "wurst-meisterkurs-zertifikat",
+    "subtitle": "Vom Anfänger zum zertifizierten Wurstkenner",
+    "description": "Umfassender Zertifikatskurs mit Videos, Praxisaufgaben und offiziellem Alles-Wurst-Zertifikat nach erfolgreichem Abschluss.",
+    "learningGoals": [
+      "Professionelle Wurstherstellung beherrschen",
+      "Hygiene und HACCP im Betrieb umsetzen",
+      "Eigene Wurstlinie planen"
+    ],
+    "courseType": "zertifikatskurs",
+    "certificateType": "achievement",
+    "estimatedMinutes": 480
+  },
+  "modules": [
+    {
+      "title": "Modul 1 — Grundlagen",
+      "sortOrder": 10,
+      "lessons": [
+        {
+          "title": "Kurseinführung",
+          "slug": "einfuehrung",
+          "lessonType": "video",
+          "sortOrder": 10,
+          "vimeoVideoId": "https://player.vimeo.com/video/987654321"
+        },
+        {
+          "title": "Arbeitsplatz und Hygiene",
+          "slug": "hygiene",
+          "lessonType": "text",
+          "sortOrder": 20,
+          "textContent": "Ein sauberer Arbeitsplatz ist die Grundlage jeder professionellen Wurstherstellung."
+        }
+      ]
+    },
+    {
+      "title": "Modul 2 — Praxis",
+      "sortOrder": 20,
+      "lessons": [
+        {
+          "title": "Video: Bratwurst herstellen",
+          "slug": "bratwurst-video",
+          "lessonType": "video",
+          "sortOrder": 10,
+          "vimeoVideoId": "987654321"
+        },
+        {
+          "title": "Arbeitsblatt Download",
+          "slug": "arbeitsblatt",
+          "lessonType": "download",
+          "sortOrder": 20
+        }
+      ]
+    },
+    {
+      "title": "Abschluss",
+      "sortOrder": 30,
+      "lessons": [
+        {
+          "title": "Dein Zertifikat",
+          "slug": "zertifikat",
+          "lessonType": "certificate",
+          "sortOrder": 10
+        }
+      ]
+    }
+  ]
+}

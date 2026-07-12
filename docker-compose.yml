@@ -1,0 +1,50 @@
+# =============================================================================
+# docker-compose.yml — Lokale PostgreSQL-Datenbank für Alles-Wurst 2.0
+# =============================================================================
+# Zweck:
+#   Startet eine PostgreSQL-Instanz für die lokale Entwicklung.
+#   Wird von Prisma über DATABASE_URL angesprochen (siehe .env.example).
+#
+# Verwendung:
+#   docker compose up -d      → Container im Hintergrund starten
+#   docker compose down       → Container stoppen (Daten bleiben im Volume)
+#   docker compose logs -f    → Logs verfolgen
+#
+# Hinweis:
+#   Zugangsdaten sind nur für die lokale Entwicklung gedacht — niemals
+#   in Produktion verwenden.
+# =============================================================================
+
+services:
+  postgres:
+    # Alpine-Image: klein, stabil, ausreichend für lokale Entwicklung
+    image: postgres:16-alpine
+    container_name: alles-wurst-postgres
+
+    # Container nach Neustart des Rechners automatisch wieder starten
+    restart: unless-stopped
+
+    ports:
+      # Host-Port 5432 → Container-Port 5432 (Standard-PostgreSQL-Port)
+      - "5432:5432"
+
+    environment:
+      # Diese Werte müssen mit DATABASE_URL in .env übereinstimmen
+      POSTGRES_USER: alles_wurst
+      POSTGRES_PASSWORD: alles_wurst_dev
+      POSTGRES_DB: alles_wurst
+
+    volumes:
+      # Persistente Datenspeicherung — Daten überleben Container-Neustarts
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      # Prisma-Migrationen erst starten, wenn die DB wirklich bereit ist
+      test: ["CMD-SHELL", "pg_isready -U alles_wurst -d alles_wurst"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    name: alles-wurst-postgres-data

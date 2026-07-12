@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/*
+  Alles-Wurst 2.0 – Design-Tokens (Corporate Design Manual v3.0)
+  Dunkel, hochwertig, handwerklich. Gold-Akzent auf tiefem Anthrazit.
+*/
+@theme {
+  /* Flächen & Hintergründe */
+  --color-aw-bg: #14191c;
+  --color-aw-surface: #1a2327;
+  --color-aw-surface-2: #222d32;
+  --color-aw-border: #37474f;
+
+  /* Marken-Akzente */
+  --color-aw-gold: #d4af37;
+  --color-aw-gold-dark: #8b6914;
+  --color-aw-brown: #503a1a;
+
+  /* Mitgliedschafts-Stufen (Metall-Töne) */
+  --color-aw-bronze: #c1824a;
+  --color-aw-bronze-dark: #8a5a30;
+  --color-aw-silver: #c3ccd4;
+  --color-aw-silver-dark: #8b96a0;
+
+  /* Text */
+  --color-aw-cream: #faf7f0;
+  --color-aw-muted: #90a4ae;
+
+  /* Status */
+  --color-aw-success: #2e7d32;
+  --color-aw-warning: #f57f17;
+  --color-aw-error: #c62828;
+}
+
+@theme inline {
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), ui-serif, Georgia, serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-aw-bg);
+  color: var(--color-aw-cream);
+  font-family: var(--font-sans);
+}
+
+/* Dezente Gold-Fokusringe für Barrierefreiheit */
+:focus-visible {
+  outline: 2px solid var(--color-aw-gold);
+  outline-offset: 2px;
+}
+
+/* Feine Scrollbar im Markenstil */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-aw-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-aw-border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-aw-gold-dark);
+}
+
+/* Rezept-PDF-Export: Druckränder und Fußzeilenabstand */
+@media print {
+  @page {
+    margin: 14mm 12mm 18mm;
+    size: A4;
+  }
+
+  .recipe-print-document {
+    max-width: none;
+  }
+
+  .recipe-print-footer {
+    margin-bottom: 0;
+  }
+}

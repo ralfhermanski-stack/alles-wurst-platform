@@ -1,0 +1,15 @@
+---
+description: Dev-Server nach Schema-/Config-Änderungen selbstständig neu starten
+alwaysApply: true
+---
+
+# Dev-Server selbstständig neu starten
+
+Nach Änderungen, die einen Neustart erfordern (z. B. Prisma-Migration, `prisma generate`, neue ENV-Variablen, Stripe-/Payment-Config), den Dev-Server **ohne Rückfrage** selbst neu starten:
+
+1. Laufende Prozesse auf Port 3000/3001 beenden
+2. Bei Prisma-Änderungen: `npx prisma generate` (ggf. `prisma migrate deploy`)
+3. `npm run dev` im Hintergrund starten
+4. Erfolg prüfen (Ready / keine EPERM-Fehler)
+
+Den Nutzer **nicht** bitten, den Server manuell neu zu starten.

@@ -1,0 +1,4916 @@
+// =============================================================================
+// prisma/schema.prisma — Datenbankschema für Alles-Wurst 2.0
+// =============================================================================
+// Stand: Schritt 17 (Zahlungsgrundlage)
+//
+// Enthält:
+//   - ConnectionTest  — technischer Verbindungstest (Schritt 1)
+//   - Recipe          — Wurstrezepte für den Rezeptgenerator (Schritt 2)
+//   - RecipeCategory  — verwaltete Wurstkategorien (Schritt 9)
+//   - RecipeGeneratorSettings — globale PDF-/Tool-Einstellungen (Schritt 9)
+//   - User / UserProfile — Nutzerstamm mit Adresse (Schritt 12)
+//   - Membership — Mitgliedschaft, Zahlung, Buchhaltungsvermerke (Schritt 12)
+//
+// Fachmodell: docs/REZEPTGENERATOR_DATENMODELL.md (Version 1.1)
+// Einrichtung:  docs/DATENBANK_SETUP.md
+// =============================================================================
+
+// Prisma Client Generator — erzeugt typsicheren TypeScript-Client
+generator client {
+  provider = "prisma-client-js"
+}
+
+// PostgreSQL als Datenbank — Verbindung über DATABASE_URL in .env
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ConnectionTest — Minimaler technischer Verbindungstest
+// -----------------------------------------------------------------------------
+// Zweck:
+//   Prüft, ob die Anwendung die Datenbank erreichen und schreiben kann.
+//   Keine Fachdaten — wird in scripts/test-db-connection.cjs verwendet.
+//
+// Verwendung:
+//   npm run db:test
+// -----------------------------------------------------------------------------
+model ConnectionTest {
+  /// Eindeutige ID (UUID, von Prisma automatisch vergeben)
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Kurze Statusmeldung — Standard: "ok"
+  message String @default("ok")
+
+  /// Zeitpunkt des Verbindungstests (automatisch beim INSERT)
+  checkedAt DateTime @default(now()) @map("checked_at")
+
+  /// Tabellenname in PostgreSQL (snake_case-Konvention)
+  @@map("connection_test")
+}
+
+// =============================================================================
+// Enums — Rezeptgenerator (Stammdaten)
+// =============================================================================
+
+/// Lebenszyklus eines Rezepts im Rezeptgenerator
+enum RecipeStatus {
+  /// In Bearbeitung, noch nicht final gespeichert
+  draft
+  /// Vom Nutzer gespeichert
+  saved
+  /// Veröffentlicht (z. B. in Rezeptdatenbank — ab Meister-Stufe)
+  published
+}
+
+/// Sichtbarkeit / Veröffentlichungsstufe des Rezepts
+enum RecipeVisibility {
+  /// Nur für den Besitzer sichtbar
+  private
+  /// Öffentlich im Profil sichtbar
+  public
+  /// In der gemeinsamen Rezeptdatenbank (Meister)
+  database
+}
+
+/// Moderationsstatus für Admin-Freigabe-Workflow
+enum RecipeModerationStatus {
+  /// Keine Moderation angefordert
+  none
+  /// Wartet auf Admin-Prüfung
+  pending
+  /// Vom Admin freigegeben
+  approved
+  /// Vom Admin abgelehnt
+  rejected
+  /// Vom Admin gesperrt
+  blocked
+}
+
+/// Rezeptart — Wurstrezept vs. Marinade (getrennte Generatoren)
+enum RecipeKind {
+  wurst
+  marinade
+}
+
+/// PDF-Status für gespeicherte Rezept-PDFs
+enum RecipePdfStatus {
+  none
+  current
+  outdated
+}
+
+/// Herkunft eines Rezepts — steuert Teilen-Freigabe
+enum RecipeSource {
+  USER
+  ADMIN
+  PREMIUM_DATABASE
+}
+
+// -----------------------------------------------------------------------------
+// Recipe — Wurstrezept (Rezeptgenerator)
+// -----------------------------------------------------------------------------
+// Zweck:
+//   Speichert Stammdaten und Berechnungsgrundlage eines Rezepts.
+//   Detaildaten (Fleisch, Schüttung, Gewürze, Hülle, Produktion, Räuchern)
+//   liegen im JSON-Feld `payload` — siehe REZEPTGENERATOR_DATENMODELL.md §2.4.
+//
+// Bewusst NICHT enthalten:
+//   - Analyse-Felder (analysis_snapshot, analysis_score) — nur in
+//     recipe_analysis_snapshots (Phase 4, separates Modul)
+//   - FK zu users — userId bleibt UUID-String ohne FK, bis bestehende
+//     localStorage-IDs bei Registrierung verknüpft sind (Schritt 12+)
+//
+// Payload-Inhalt (JSON, nicht relational):
+//   - calculation, meats (+ S1–S10/R1–R5), binders, schuettung
+//   - ingredients (+ referenceBasis), casing, production, smoking
+// -----------------------------------------------------------------------------
+model Recipe {
+  /// Eindeutige Rezept-ID (UUID)
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Besitzer (Ersteller) — UUID ohne FK, bis User-Tabelle angelegt ist
+  userId String @map("user_id") @db.Uuid
+
+  /// Rezeptname (Pflichtfeld in der Anwendung)
+  name String
+
+  /// Wurstkategorie (z. B. Rohwurst, Brühwurst) — optional, Freitext bis Katalog existiert
+  category String?
+
+  /// Kurzbeschreibung / Notizen
+  description String? @db.Text
+
+  /// Zustand: draft | saved | published
+  status RecipeStatus @default(draft)
+
+  /// Sichtbarkeit: private | public | database
+  visibility RecipeVisibility @default(private)
+
+  /// Ziel-Gesamtgewicht der Charge in kg (dupliziert aus payload.calculation für Abfragen)
+  totalWeightKg Decimal? @map("total_weight_kg") @db.Decimal(10, 3)
+
+  /// Vollständige Rezeptdaten als JSON (Fleisch, Gewürze, Herstellung usw.)
+  payload Json @default("{}")
+
+  /// Versionsnummer — wird bei jeder inhaltlichen Speicherung erhöht (ab erstem Save)
+  version Int @default(1)
+
+  /// Zeitpunkt der Veröffentlichung in der Rezeptdatenbank (null = nicht veröffentlicht)
+  publishedAt DateTime? @map("published_at")
+
+  /// Erstellungszeitpunkt (UTC)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// Letzte Änderung (automatisch von Prisma aktualisiert)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Soft-Delete — null = aktiv, gesetzt = gelöscht (logisch)
+  deletedAt DateTime? @map("deleted_at")
+
+  /// Moderationsstatus (Admin-Freigabe-Workflow)
+  moderationStatus RecipeModerationStatus @default(none) @map("moderation_status")
+
+  /// Interner Admin-Kommentar (z. B. Ablehnungsgrund)
+  adminComment String? @map("admin_comment") @db.Text
+
+  /// Zeitpunkt der letzten Moderationsentscheidung
+  moderationReviewedAt DateTime? @map("moderation_reviewed_at")
+
+  /// In offizieller Rezeptdatenbank übernommen
+  isOfficialDatabase Boolean @default(false) @map("is_official_database")
+
+  /// Herkunft — nur USER-Rezepte dürfen geteilt werden
+  source RecipeSource @default(USER)
+
+  /// Zeitpunkt der Sperrung durch Admin
+  blockedAt DateTime? @map("blocked_at")
+
+  /// Rezeptbild — Speicherschlüssel und Originaldateiname (kein Einbrennen)
+  imageStorageKey String? @map("image_storage_key")
+  imageFileName   String? @map("image_file_name")
+
+  /// Rezeptart: wurst (Standard) | marinade
+  recipeKind RecipeKind @default(wurst) @map("recipe_kind")
+
+  /// Gespeichertes PDF (serverseitig, geschützter Download)
+  pdfStorageKey  String?         @map("pdf_storage_key")
+  pdfGeneratedAt DateTime?       @map("pdf_generated_at")
+  pdfVersion     Int?            @map("pdf_version")
+  pdfStatus      RecipePdfStatus @default(none) @map("pdf_status")
+
+  publicShares PublicShare[]
+  productRecommendationLinks ProductRecommendationRecipeLink[]
+
+  /// Abfragen nach Besitzer (z. B. „meine Rezepte“)
+  @@index([userId])
+  /// Filter in Rezeptdatenbank / Sichtbarkeitsprüfungen
+  @@index([visibility])
+  /// Filter nach Wurstkategorie
+  @@index([category])
+  /// Admin-Moderationsqueue
+  @@index([moderationStatus])
+  @@index([recipeKind])
+  @@index([source])
+  @@map("recipes")
+}
+
+// -----------------------------------------------------------------------------
+// RecipeCategory — Verwaltete Wurstkategorien (Admin)
+// -----------------------------------------------------------------------------
+model RecipeCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  slug        String   @unique
+  description String?  @db.Text
+  sortOrder   Int      @default(0) @map("sort_order")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("recipe_categories")
+}
+
+// -----------------------------------------------------------------------------
+// RecipeGeneratorSettings — Globale Einstellungen (Singleton, id = "default")
+// -----------------------------------------------------------------------------
+model RecipeGeneratorSettings {
+  id                 String   @id @default("default")
+  pdfHeaderText      String   @default("Alles-Wurst Rezeptgenerator") @map("pdf_header_text")
+  pdfFooterText      String   @default("Erstellt mit dem Alles-Wurst Rezeptgenerator") @map("pdf_footer_text")
+  pdfLogoPlaceholder String   @default("Logo") @map("pdf_logo_placeholder")
+  pdfLegalNotice     String   @default("") @map("pdf_legal_notice") @db.Text
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("recipe_generator_settings")
+}
+
+// =============================================================================
+// Enums — User, Mitgliedschaft & Zahlung (Schritt 12)
+// =============================================================================
+
+/// Mitgliedschaftsstufe / Systemrolle (persistiert in `memberships.role`)
+enum MembershipRole {
+  guest
+  registered
+  wurstclub
+  meisterclub
+  accounting
+  /// @deprecated Nur noch für Legacy-Daten — Adminrechte über User.systemRole
+  admin
+}
+
+/// Systemrolle des Nutzers (getrennt von Mitgliedschaftslevel)
+enum UserSystemRole {
+  USER
+  ADMIN
+  SUPPORT
+  INSTRUCTOR
+  /// Vollzugriff auf Rechteverwaltung und kritische Systemeinstellungen
+  SUPERADMIN
+}
+
+/// Kontostatus (Login und Plattformzugriff)
+enum UserAccountStatus {
+  active
+  suspended
+  deactivated
+}
+
+/// Lebenszyklus einer Mitgliedschaft
+enum MembershipStatus {
+  /// Keine aktive Mitgliedschaft (Basis nach Registrierung)
+  none
+  /// Aktiv und gültig
+  active
+  /// Vorübergehend pausiert (z. B. durch Buchhaltung)
+  paused
+  /// Vom Nutzer oder Support beendet
+  cancelled
+  /// Abgelaufen (Enddatum überschritten)
+  expired
+  /// Gesperrt — kein Club-/Rezeptzugriff
+  blocked
+}
+
+/// Zahlungsstatus der Mitgliedschaft
+enum PaymentStatus {
+  /// Noch keine Zahlung erforderlich / nicht relevant
+  none
+  /// Zahlung ausstehend
+  pending
+  /// Bezahlt
+  paid
+  /// Zahlung fehlgeschlagen
+  failed
+  /// Überfällig
+  overdue
+  /// Erstattet
+  refunded
+}
+
+// -----------------------------------------------------------------------------
+// User — Plattform-Nutzer (Registrierung & Login vorbereitet)
+// -----------------------------------------------------------------------------
+// Zweck:
+//   Zentraler Nutzerstamm für Registrierung, Login und Mitgliedschaft.
+//   Passwort und E-Mail-Verifikation werden erst in späteren Schritten genutzt.
+//
+// Bewusst noch NICHT angebunden:
+//   - Kein Login, keine Session, kein Ersetzen von localStorage-userId
+// -----------------------------------------------------------------------------
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Eindeutige E-Mail (Login-Kennung — später)
+  email String @unique
+
+  /// Passwort-Hash (bcrypt/argon2 — null bis Registrierung abgeschlossen)
+  passwordHash String? @map("password_hash")
+
+  /// Zeitpunkt der E-Mail-Bestätigung (null = unbestätigt)
+  emailVerifiedAt DateTime? @map("email_verified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Soft-Delete — null = aktiv
+  deletedAt DateTime? @map("deleted_at")
+
+  /// Systemrolle (Adminrechte) — unabhängig von Mitgliedschaft
+  systemRole UserSystemRole @default(USER) @map("system_role")
+
+  /// Kontostatus (aktiv / gesperrt / deaktiviert)
+  accountStatus UserAccountStatus @default(active) @map("account_status")
+
+  /// Letzter erfolgreicher Login (optional)
+  lastLoginAt DateTime? @map("last_login_at")
+
+  /// Wartungsmodus: normale Website trotz Wartung sehen (ohne Admin-Rolle)
+  maintenanceBypass Boolean @default(false) @map("maintenance_bypass")
+
+  stripeCustomerIdTest String? @map("stripe_customer_id_test")
+  stripeCustomerIdLive String? @map("stripe_customer_id_live")
+
+  profile    UserProfile?
+  membership Membership?
+  auditLogs  MembershipAuditLog[] @relation("AuditTargetUser")
+  accountingPositions AccountingPosition[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  checkoutIntents         CheckoutIntent[]
+  courseAccess            CourseAccess[]
+  invoices                Invoice[]
+  creditNotes             CreditNote[]
+  courseLessonProgress    CourseLessonProgress[]
+  userCourseAccess        UserCourseAccess[]
+  courseCertificates      UserCourseCertificate[]
+  courseReviews           CourseReview[]
+  platformReviews         PlatformReview[]
+  platformReviewsModerated PlatformReview[] @relation("PlatformReviewModerator")
+  forumThreads            ForumThread[]
+  forumPosts              ForumPost[]
+  supportTicketsCreated   SupportTicket[]         @relation("SupportTicketCreator")
+  supportTicketsAssigned  SupportTicket[]         @relation("SupportTicketAssignee")
+  supportTicketMessages   SupportTicketMessage[]
+  supportTicketInternalNotes SupportTicketInternalNote[]
+  supportTicketAttachments SupportTicketAttachment[] @relation("SupportAttachmentUploader")
+  supportTicketEvents     SupportTicketEvent[]    @relation("SupportTicketEventActor")
+  blogPostsAuthored       BlogPost[]              @relation("BlogPostAuthor")
+  challengeSubmissions    ChallengeSubmission[]
+  challengeVotes          ChallengeVote[]
+  challengeUserStates     ChallengeUserState[]
+  challengeNotificationLogs ChallengeNotificationLog[]
+  withdrawalRequestsAssigned WithdrawalRequest[] @relation("WithdrawalAssignee")
+  withdrawalRequests         WithdrawalRequest[] @relation("WithdrawalUser")
+  legalDocumentVersionsPublished LegalDocumentVersion[] @relation("LegalVersionPublisher")
+  legalDocumentVersionsImported  LegalDocumentVersion[] @relation("LegalVersionImporter")
+  accountMessages            UserAccountMessage[]
+  privacyRequests            PrivacyRequest[]
+  privacyRequestsAssigned    PrivacyRequest[] @relation("PrivacyAssignee")
+  dataExportRequests         DataExportRequest[]
+  accountDeletionPlans       AccountDeletionPlan[]
+  accountDataRetentions      AccountDataRetention[]
+  membershipRenewalReminderLogs MembershipRenewalReminderLog[]
+  emailMessagesRequested     EmailMessage[]          @relation("EmailRequestedBy")
+  emailTemplateVersionsCreated EmailTemplateVersion[] @relation("EmailTemplateCreator")
+  emailTemplateVersionsPublished EmailTemplateVersion[] @relation("EmailTemplatePublisher")
+  emailPreferences           EmailPreference[]
+  publicShares               PublicShare[]
+  userGroupMembers           UserGroupMember[]
+  userPermissions            UserPermission[]
+  permissionAuditLogsTarget  PermissionAuditLog[] @relation("PermissionAuditTarget")
+  permissionAuditLogsActor   PermissionAuditLog[] @relation("PermissionAuditActor")
+  userGroupMembersAssigned   UserGroupMember[]    @relation("UserGroupAssignedBy")
+  userPermissionsAssigned    UserPermission[]     @relation("UserPermissionAssignedBy")
+  productRecommendationClickEvents ProductRecommendationClickEvent[]
+  securityEvents                 SecurityEvent[]
+  securityAuditLogsAsActor       SecurityAuditLog[] @relation("SecurityAuditActor")
+  securityAuditLogsAsTarget      SecurityAuditLog[] @relation("SecurityAuditTarget")
+  userSessions                   UserSession[]
+  userTotp                       UserTotp?
+  totpBackupCodes                TotpBackupCode[]
+  suspiciousUserFlags            SuspiciousUserFlag[]
+  blockedIpsCreated              BlockedIp[] @relation("BlockedIpCreatedBy")
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// -----------------------------------------------------------------------------
+// EmailVerificationToken — Einmal-Token zur E-Mail-Bestätigung (nur Hash in DB)
+// -----------------------------------------------------------------------------
+model EmailVerificationToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// HMAC-SHA256-Hash des Klartext-Tokens (Klartext nur in E-Mail/Link)
+  tokenHash String @map("token_hash")
+
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+// -----------------------------------------------------------------------------
+// PasswordResetToken — Einmal-Token zum Passwort zurücksetzen (nur Hash in DB)
+// -----------------------------------------------------------------------------
+model PasswordResetToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// HMAC-SHA256-Hash des Klartext-Tokens
+  tokenHash String @map("token_hash")
+
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// -----------------------------------------------------------------------------
+// UserProfile — Persönliche Daten und vollständige Adresse
+// -----------------------------------------------------------------------------
+model UserProfile {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Anrede (z. B. Herr, Frau, Divers)
+  salutation String?
+
+  /// Öffentlich sichtbarer Anzeigename (Forum/Bewertungen).
+  /// Muss eindeutig sein (oder zumindest validiert).
+  publicName String? @unique @map("public_name")
+
+  /// Öffentliche Avatar-URL (z. B. /api/users/{id}/avatar oder externe URL).
+  avatarUrl String? @map("avatar_url")
+
+  /// Interner Speicherpfad für hochgeladenes Profilbild.
+  avatarStorageKey String? @map("avatar_storage_key")
+  avatarFileName   String? @map("avatar_file_name")
+
+  /// Kurze öffentliche Profilbeschreibung.
+  bio String? @db.Text
+
+  firstName String @map("first_name")
+  lastName  String @map("last_name")
+
+  /// Firmenname (optional, z. B. Metzgerei)
+  company String?
+
+  street      String
+  houseNumber String  @map("house_number")
+  addressLine2 String? @map("address_line2")
+
+  postalCode String @map("postal_code")
+  city       String
+
+  /// Bundesland / Region (optional)
+  stateRegion String? @map("state_region")
+
+  /// ISO-Ländercode (Standard: DE)
+  country String @default("DE")
+
+  phone String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("user_profiles")
+}
+
+// -----------------------------------------------------------------------------
+// Membership — Mitgliedschaft, Zahlung & manuelle Korrekturen (Buchhaltung)
+// -----------------------------------------------------------------------------
+// Zweck:
+//   Eine Mitgliedschaft pro Nutzer (1:1). Buchhaltung kann Status, Zahlung
+//   und Zugriffssperre manuell korrigieren, wenn Webhooks nicht greifen.
+//
+// Bewusst noch NICHT angebunden:
+//   - Keine PayPal/Stripe/Überweisung, keine Buchhaltungs-UI
+// -----------------------------------------------------------------------------
+model Membership {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role   MembershipRole   @default(registered)
+  status MembershipStatus @default(none)
+  paymentStatus PaymentStatus @default(none) @map("payment_status")
+
+  /// Öffentliche Zahlungsnotiz (z. B. für Support-Kommunikation)
+  paymentNote String? @map("payment_note") @db.Text
+
+  /// Interner Buchhaltungsvermerk (nicht für Nutzer sichtbar)
+  accountingNote String? @map("accounting_note") @db.Text
+
+  /// Manuelle Zugriffssperre für Rezept-/Club-Funktionen
+  accessBlocked Boolean @default(false) @map("access_blocked")
+
+  /// Begründung für Sperre oder manuelle Korrektur
+  blockReason String? @map("block_reason") @db.Text
+
+  /// Beginn der Mitgliedschaft
+  startedAt DateTime? @map("started_at")
+
+  /// Geplantes oder tatsächliches Ende
+  endsAt DateTime? @map("ends_at")
+
+  /// Manuelle Verlängerung (Buchhaltung) — überschreibt endsAt logisch
+  extendedUntil DateTime? @map("extended_until")
+
+  /// Abrechnungsperiode des aktiven Abos (monatlich/jährlich)
+  billingPeriod BillingPeriod? @map("billing_period")
+
+  /// Automatische Verlängerung aktiv (Stripe-Abo)
+  autoRenewEnabled Boolean @default(true) @map("auto_renew_enabled")
+
+  /// Keine Verlängerung — läuft zum Periodenende aus
+  cancelAtPeriodEnd Boolean @default(false) @map("cancel_at_period_end")
+
+  /// Grund der Kündigung zum Periodenende
+  cancelReason MembershipCancelReason? @map("cancel_reason")
+
+  /// Zeitpunkt der Kündigungsanfrage
+  cancelRequestedAt DateTime? @map("cancel_requested_at")
+
+  /// Admin: Verlängerungshinweise unterdrücken
+  renewalRemindersSuppressed Boolean @default(false) @map("renewal_reminders_suppressed")
+
+  /// Für welches Periodenende zuletzt eine Erinnerung gesendet wurde (Idempotenz)
+  lastRenewalReminderForPeriodEnd DateTime? @map("last_renewal_reminder_for_period_end")
+
+  renewalReminderLogs MembershipRenewalReminderLog[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([role])
+  @@index([paymentStatus])
+  @@index([accessBlocked])
+  @@index([cancelAtPeriodEnd])
+  @@index([extendedUntil])
+  @@index([endsAt])
+  @@map("memberships")
+}
+
+/// Grund für Kündigung zum Periodenende
+enum MembershipCancelReason {
+  user_request
+  account_deletion
+  admin
+  stripe_sync
+  payment_failed
+}
+
+/// Status eines Verlängerungshinweises
+enum MembershipRenewalReminderStatus {
+  sent
+  skipped
+  failed
+  suppressed
+}
+
+/// Protokoll gesendeter Verlängerungshinweise (Admin-Nachvollziehbarkeit)
+model MembershipRenewalReminderLog {
+  id String @id @default(cuid())
+
+  membershipId String     @map("membership_id") @db.Uuid
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  billingPeriod BillingPeriod @map("billing_period")
+  periodEndAt   DateTime      @map("period_end_at")
+  leadDays      Int           @map("lead_days")
+
+  status     MembershipRenewalReminderStatus
+  skipReason String? @map("skip_reason") @db.Text
+  errorMessage String? @map("error_message") @db.Text
+
+  /// cron | admin_manual
+  triggeredBy String @default("cron") @map("triggered_by")
+  actorUserId String? @map("actor_user_id") @db.Uuid
+
+  emailMessageId String? @map("email_message_id")
+
+  sentAt    DateTime? @map("sent_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@unique([membershipId, periodEndAt, leadDays])
+  @@index([userId])
+  @@index([status])
+  @@index([periodEndAt])
+  @@index([createdAt])
+  @@map("membership_renewal_reminder_logs")
+}
+
+/// Audit-Aktionen der Buchhaltung (Mitgliedschaft & Zahlung)
+enum MembershipAuditAction {
+  membership_pause
+  membership_reactivate
+  membership_extend
+  membership_end
+  membership_block
+  membership_unlock
+  payment_status_change
+  role_change
+  payment_note
+  accounting_note
+  manual_update
+  position_create
+  position_update
+  position_status_change
+  checkout_create
+  payment_intent_create
+  payment_fulfillment
+  invoice_create
+  invoice_cancel
+  credit_note_create
+  user_suspend
+  user_activate
+  user_deactivate
+  system_role_change
+  course_access_grant
+  course_access_revoke
+}
+
+// -----------------------------------------------------------------------------
+// MembershipAuditLog — Änderungsverlauf für Buchhaltungs-Korrekturen
+// -----------------------------------------------------------------------------
+model MembershipAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Betroffener Nutzer
+  targetUserId String @map("target_user_id") @db.Uuid
+  targetUser   User   @relation("AuditTargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  /// Ausführende Person (Buchhaltung oder Admin)
+  actorUserId String @map("actor_user_id") @db.Uuid
+  actorRole   MembershipRole @map("actor_role")
+
+  action MembershipAuditAction
+
+  /// Kurzbeschreibung auf Deutsch
+  summary String
+
+  /// Vorherige Werte (JSON-Snapshot relevanter Felder)
+  previousValues Json? @map("previous_values")
+
+  /// Neue Werte (JSON-Snapshot relevanter Felder)
+  newValues Json? @map("new_values")
+
+  /// Optionaler Vermerk zur Aktion
+  note String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([targetUserId])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("membership_audit_logs")
+}
+
+/// Produkttyp einer Buchhaltungsposition
+enum AccountingProductType {
+  membership
+  course
+  workshop
+  manual
+}
+
+/// Zahlungsstatus einer Buchhaltungsposition (Kurs, Workshop, manuell)
+enum AccountingPositionPaymentStatus {
+  pending
+  paid
+  overdue
+  cancelled
+  refunded
+}
+
+// -----------------------------------------------------------------------------
+// AccountingPosition — Nutzerbezogene Kurs-/Produktkosten & manuelle Posten
+// -----------------------------------------------------------------------------
+// Zweck:
+//   Buchhaltungspositionen pro Nutzer — Kurskäufe, Workshops, Mitgliedschaften
+//   und manuelle Korrekturen. Vorbereitet für LearnPress/PMP, noch ohne Anbindung.
+//
+// Bewusst noch NICHT enthalten:
+//   - Rechnungserstellung, Stripe/PayPal, LearnPress-Sync
+// -----------------------------------------------------------------------------
+model AccountingPosition {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productType AccountingProductType @map("product_type")
+  productName String @map("product_name")
+
+  grossAmount Decimal @map("gross_amount") @db.Decimal(12, 2)
+  netAmount   Decimal @map("net_amount") @db.Decimal(12, 2)
+  taxRate     Decimal @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal @map("tax_amount") @db.Decimal(12, 2)
+  currency    String  @default("EUR")
+
+  paymentStatus AccountingPositionPaymentStatus @default(pending) @map("payment_status")
+
+  dueDate DateTime? @map("due_date")
+  paidAt  DateTime? @map("paid_at")
+
+  note String? @db.Text
+
+  /// Verknüpfung zum Produktkatalog (optional)
+  productPriceId String? @map("product_price_id") @db.Uuid
+  productPrice   ProductPrice? @relation(fields: [productPriceId], references: [id], onDelete: SetNull)
+
+  /// Gewählter Zahlungsanbieter (bei Checkout-Vorbereitung)
+  paymentProvider PaymentProvider? @map("payment_provider")
+
+  checkoutIntent CheckoutIntent?
+  paymentIntents PaymentIntent[]
+  invoice        Invoice?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([paymentStatus])
+  @@index([productType])
+  @@index([dueDate])
+  @@index([productPriceId])
+  @@index([paymentProvider])
+  @@map("accounting_positions")
+}
+
+// =============================================================================
+// Enums & Modelle — Zahlungsgrundlage (Schritt 17)
+// =============================================================================
+
+/// Produktart im Katalog (Mitgliedschaft, Kurs, Workshop)
+enum ProductKind {
+  membership_wurstclub
+  membership_meisterclub
+  course
+  workshop
+}
+
+/// Abrechnungszeitraum eines Preises
+enum BillingPeriod {
+  one_time
+  monthly
+  yearly
+}
+
+/// Zahlungsanbieter (vorbereitet für Stripe, PayPal, Überweisung)
+enum PaymentProvider {
+  stripe
+  paypal
+  bank_transfer
+  manual
+}
+
+/// Status eines Checkout-Intents (Warenkorb / Kaufabsicht)
+enum CheckoutIntentStatus {
+  created
+  awaiting_payment
+  processing
+  succeeded
+  failed
+  cancelled
+  expired
+}
+
+/// Status eines Payment-Intents (konkreter Zahlungsversuch)
+enum PaymentIntentStatus {
+  created
+  awaiting_payment
+  processing
+  succeeded
+  failed
+  cancelled
+  expired
+}
+
+/// Status eines Kurs-/Workshop-Zugriffs
+enum CourseAccessStatus {
+  pending
+  active
+  revoked
+  expired
+}
+
+/// Herkunft eines Kurszugriffs
+enum CourseAccessSource {
+  payment
+  manual
+  accounting
+  membership_bonus
+}
+
+// -----------------------------------------------------------------------------
+// Product — Katalogprodukt (Wurstclub, Meisterclub, Kurse, Workshops)
+// -----------------------------------------------------------------------------
+model Product {
+  id String @id @default(uuid()) @db.Uuid
+
+  kind ProductKind
+  slug String @unique
+  name String
+  description String? @db.Text
+
+  active    Boolean @default(true)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  /// Rechtliche Vertragsart (fachlich vor Livegang prüfen)
+  legalProductType LegalProductType? @map("legal_product_type")
+  legalConfig      Json              @default("{}") @map("legal_config")
+
+  /// Externe Referenz (z. B. LearnPress-Kurs-ID — später)
+  externalRef String? @map("external_ref")
+
+  prices       ProductPrice[]
+  courseAccess CourseAccess[]
+  course       Course?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([kind])
+  @@index([active])
+  @@map("products")
+}
+
+// -----------------------------------------------------------------------------
+// ProductPrice — Preis zu einem Katalogprodukt
+// -----------------------------------------------------------------------------
+model ProductPrice {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId String  @map("product_id") @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  grossAmount Decimal @map("gross_amount") @db.Decimal(12, 2)
+  netAmount   Decimal @map("net_amount") @db.Decimal(12, 2)
+  taxRate     Decimal @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal @map("tax_amount") @db.Decimal(12, 2)
+  currency    String  @default("EUR")
+
+  billingPeriod BillingPeriod @default(one_time) @map("billing_period")
+
+  active    Boolean   @default(true)
+  validFrom DateTime? @map("valid_from")
+  validUntil DateTime? @map("valid_until")
+
+  checkoutIntents     CheckoutIntent[]
+  accountingPositions AccountingPosition[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@index([active])
+  @@map("product_prices")
+}
+
+// -----------------------------------------------------------------------------
+// CheckoutIntent — Kaufabsicht (noch ohne echten Checkout)
+// -----------------------------------------------------------------------------
+model CheckoutIntent {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productPriceId String       @map("product_price_id") @db.Uuid
+  productPrice   ProductPrice @relation(fields: [productPriceId], references: [id], onDelete: Restrict)
+
+  paymentProvider PaymentProvider @map("payment_provider")
+  status          CheckoutIntentStatus @default(created)
+
+  grossAmount Decimal @map("gross_amount") @db.Decimal(12, 2)
+  netAmount   Decimal @map("net_amount") @db.Decimal(12, 2)
+  taxRate     Decimal @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal @map("tax_amount") @db.Decimal(12, 2)
+  currency    String  @default("EUR")
+
+  accountingPositionId String?             @unique @map("accounting_position_id") @db.Uuid
+  accountingPosition   AccountingPosition? @relation(fields: [accountingPositionId], references: [id], onDelete: SetNull)
+
+  paymentIntents PaymentIntent[]
+  courseAccess   CourseAccess[]
+  legalConsents  CheckoutLegalConsent[]
+  purchaseLegalRecord PurchaseLegalRecord?
+
+  /// Provider-spezifische Metadaten (Stripe Session-ID, PayPal Order-ID, …)
+  providerMetadata Json? @map("provider_metadata")
+
+  expiresAt   DateTime? @map("expires_at")
+  completedAt DateTime? @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([paymentProvider])
+  @@index([expiresAt])
+  @@map("checkout_intents")
+}
+
+// -----------------------------------------------------------------------------
+// PaymentIntent — Zahlungsversuch zu einem Checkout
+// -----------------------------------------------------------------------------
+model PaymentIntent {
+  id String @id @default(uuid()) @db.Uuid
+
+  checkoutIntentId String         @map("checkout_intent_id") @db.Uuid
+  checkoutIntent   CheckoutIntent @relation(fields: [checkoutIntentId], references: [id], onDelete: Cascade)
+
+  paymentProvider PaymentProvider @map("payment_provider")
+  status          PaymentIntentStatus @default(created)
+
+  /// Externe Referenz (z. B. Stripe pi_…, PayPal capture_id)
+  providerReference String? @map("provider_reference")
+
+  grossAmount Decimal @map("gross_amount") @db.Decimal(12, 2)
+  currency    String  @default("EUR")
+
+  accountingPositionId String?             @map("accounting_position_id") @db.Uuid
+  accountingPosition   AccountingPosition? @relation(fields: [accountingPositionId], references: [id], onDelete: SetNull)
+
+  providerMetadata Json? @map("provider_metadata")
+
+  stripeCustomerId        String? @map("stripe_customer_id")
+  stripeCheckoutSessionId String? @map("stripe_checkout_session_id")
+  stripePaymentIntentId   String? @map("stripe_payment_intent_id")
+  stripeChargeId          String? @map("stripe_charge_id")
+  stripeSubscriptionId    String? @map("stripe_subscription_id")
+  stripeInvoiceId         String? @map("stripe_invoice_id")
+  customerName            String? @map("customer_name")
+  customerEmail           String? @map("customer_email")
+  billingAddressJson      Json?   @map("billing_address_json")
+  paymentMethodType       String? @map("payment_method_type")
+  webhookEventId          String? @map("webhook_event_id")
+  processedAt             DateTime? @map("processed_at")
+  errorMessage            String? @map("error_message") @db.Text
+
+  paidAt   DateTime? @map("paid_at")
+  failedAt DateTime? @map("failed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([checkoutIntentId])
+  @@index([status])
+  @@index([paymentProvider])
+  @@index([providerReference])
+  @@index([accountingPositionId])
+  @@index([stripeCheckoutSessionId])
+  @@index([stripePaymentIntentId])
+  @@index([webhookEventId])
+  @@map("payment_intents")
+}
+
+// =============================================================================
+// Stripe-Integration
+// =============================================================================
+
+enum StripeActiveMode {
+  test
+  live
+}
+
+enum StripeWebhookProcessedStatus {
+  pending
+  processed
+  ignored
+  failed
+}
+
+model StripeSettings {
+  id String @id @default("default")
+
+  activeMode StripeActiveMode @default(test) @map("active_mode")
+
+  lastWebhookAt     DateTime? @map("last_webhook_at")
+  lastWebhookEventId String?  @map("last_webhook_event_id")
+  lastStripeError   String?  @map("last_stripe_error") @db.Text
+
+  apiTestOk         Boolean? @map("api_test_ok")
+  apiTestCheckedAt  DateTime? @map("api_test_checked_at")
+  apiLiveOk         Boolean? @map("api_live_ok")
+  apiLiveCheckedAt  DateTime? @map("api_live_checked_at")
+
+  keyStorageNoteTest String? @map("key_storage_note_test") @db.Text
+  keyStorageNoteLive String? @map("key_storage_note_live") @db.Text
+  keyRotatedAtTest   DateTime? @map("key_rotated_at_test")
+  keyRotatedAtLive   DateTime? @map("key_rotated_at_live")
+
+  encryptedKeysTest String? @map("encrypted_keys_test") @db.Text
+  encryptedKeysLive String? @map("encrypted_keys_live") @db.Text
+  keysSavedAtTest   DateTime? @map("keys_saved_at_test")
+  keysSavedAtLive   DateTime? @map("keys_saved_at_live")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("stripe_settings")
+}
+
+model StripeWebhookEvent {
+  id String @id @default(cuid())
+
+  eventId   String @unique @map("event_id")
+  eventType String @map("event_type")
+  livemode  Boolean @default(false)
+
+  payloadJson Json @map("payload_json")
+
+  processedStatus StripeWebhookProcessedStatus @default(pending) @map("processed_status")
+  processedAt     DateTime? @map("processed_at")
+  errorMessage    String? @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([eventType])
+  @@index([processedStatus])
+  @@index([createdAt])
+  @@map("stripe_webhook_events")
+}
+
+// -----------------------------------------------------------------------------
+// CourseAccess — Kurs-/Workshop-Zugriff nach Zahlung (vorbereitet)
+// -----------------------------------------------------------------------------
+model CourseAccess {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String  @map("product_id") @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  status CourseAccessStatus @default(pending)
+  source CourseAccessSource
+
+  checkoutIntentId String?         @map("checkout_intent_id") @db.Uuid
+  checkoutIntent   CheckoutIntent? @relation(fields: [checkoutIntentId], references: [id], onDelete: SetNull)
+
+  accountingPositionId String? @map("accounting_position_id") @db.Uuid
+
+  grantedAt DateTime? @map("granted_at")
+  expiresAt DateTime? @map("expires_at")
+  pendingAccessUntil DateTime? @map("pending_access_until")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, productId])
+  @@index([status])
+  @@index([checkoutIntentId])
+  @@map("course_access")
+}
+
+// =============================================================================
+// Rechnungen (Schritt 19–20)
+// =============================================================================
+
+/// Status einer Rechnung
+enum InvoiceStatus {
+  draft
+  issued
+  paid
+  cancelled
+  refunded
+}
+
+/// Zähler für fortlaufende Rechnungsnummern
+model InvoiceSequence {
+  id String @id @default("default")
+
+  currentNumber Int @default(0) @map("current_number")
+  prefix        String @default("RE")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("invoice_sequences")
+}
+
+/// Rechnung zu einer Buchhaltungsposition (Snapshot für Druck/PDF)
+model Invoice {
+  id String @id @default(uuid()) @db.Uuid
+
+  invoiceNumber  String @unique @map("invoice_number")
+  sequenceNumber Int    @map("sequence_number")
+  sequenceYear   Int    @map("sequence_year")
+
+  accountingPositionId String             @unique @map("accounting_position_id") @db.Uuid
+  accountingPosition   AccountingPosition @relation(fields: [accountingPositionId], references: [id], onDelete: Restrict)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  invoiceDate DateTime @map("invoice_date")
+  serviceDate DateTime @map("service_date")
+  dueDate     DateTime? @map("due_date")
+
+  status InvoiceStatus @default(issued)
+
+  paymentStatus AccountingPositionPaymentStatus @map("payment_status")
+
+  /// Kundendaten zum Rechnungszeitpunkt (JSON-Snapshot)
+  customerSnapshot Json @map("customer_snapshot")
+
+  productType AccountingProductType @map("product_type")
+  productName String @map("product_name")
+
+  netAmount   Decimal @map("net_amount") @db.Decimal(12, 2)
+  taxRate     Decimal @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal @map("tax_amount") @db.Decimal(12, 2)
+  grossAmount Decimal @map("gross_amount") @db.Decimal(12, 2)
+  currency    String  @default("EUR")
+
+  noteText String? @db.Text @map("note_text")
+
+  cancelledAt DateTime? @map("cancelled_at")
+
+  creditNote CreditNote?
+
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([invoiceNumber])
+  @@index([invoiceDate])
+  @@index([status])
+  @@map("invoices")
+}
+
+/// Zähler für fortlaufende Gutschriftsnummern
+model CreditNoteSequence {
+  id String @id @default("default")
+
+  currentNumber Int @default(0) @map("current_number")
+  prefix        String @default("GS")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("credit_note_sequences")
+}
+
+/// Gutschrift zu einer stornierten/erstatteten Rechnung
+model CreditNote {
+  id String @id @default(uuid()) @db.Uuid
+
+  creditNoteNumber String @unique @map("credit_note_number")
+  sequenceNumber   Int    @map("sequence_number")
+  sequenceYear     Int    @map("sequence_year")
+
+  invoiceId String  @unique @map("invoice_id") @db.Uuid
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  creditNoteDate DateTime @map("credit_note_date")
+
+  referenceInvoiceNumber String @map("reference_invoice_number")
+
+  customerSnapshot Json @map("customer_snapshot")
+
+  productType AccountingProductType @map("product_type")
+  productName String @map("product_name")
+
+  netAmount   Decimal @map("net_amount") @db.Decimal(12, 2)
+  taxRate     Decimal @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal @map("tax_amount") @db.Decimal(12, 2)
+  grossAmount Decimal @map("gross_amount") @db.Decimal(12, 2)
+  currency    String  @default("EUR")
+
+  noteText String? @db.Text @map("note_text")
+
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([creditNoteNumber])
+  @@index([creditNoteDate])
+  @@map("credit_notes")
+}
+
+// =============================================================================
+// Kursplattform (Schritt 21)
+// =============================================================================
+
+/// Kurstyp
+enum CourseType {
+  minikurs
+  zertifikatskurs
+}
+
+/// Veröffentlichungsstatus eines Kurses
+enum CourseStatus {
+  draft
+  published
+  archived
+}
+
+/// Lektionstyp
+enum CourseLessonType {
+  video
+  text
+  download
+  recipe
+  certificate
+}
+
+/// Zertifikatstyp pro Kurs
+enum CourseCertificateType {
+  none
+  participation
+  achievement
+  masterclass
+}
+
+/// Status eines Nutzer-Zertifikats
+enum UserCertificateStatus {
+  locked
+  available
+  issued
+  revoked
+}
+
+/// Kurs mit Modulen und Lektionen (immer kostenpflichtig)
+model Course {
+  id String @id @default(uuid()) @db.Uuid
+
+  slug  String @unique
+  title String
+  subtitle    String?
+  /// Kurzbeschreibung für Karten und Katalog (Plaintext)
+  shortDescription String? @db.Text @map("short_description")
+  /// Ausführliche Beschreibung (Markdown, sicher gerendert)
+  description String? @db.Text
+  /// Kursvoraussetzungen (Markdown)
+  prerequisites String? @db.Text
+  /// Was der Teilnehmer zuhause benötigt (Markdown)
+  requiredEquipment String? @db.Text @map("required_equipment")
+  learningGoals String? @db.Text @map("learning_goals")
+
+  courseType CourseType @map("course_type")
+  status     CourseStatus @default(draft)
+
+  certificateType CourseCertificateType @default(participation) @map("certificate_type")
+  /// Bewusster Admin-Override: Minikurs darf ein vollwertiges Zertifikat ausstellen
+  certificateOverride Boolean @default(false) @map("certificate_override")
+  estimatedMinutes Int? @map("estimated_minutes")
+  sortOrder Int @default(0) @map("sort_order")
+
+  /// Preis in Cent (null = noch nicht gesetzt, 0 = bewusst kostenlos)
+  priceCents    Int?   @map("price_cents")
+  priceCurrency String @default("EUR") @map("price_currency")
+
+  /// Hervorhebung auf der Startseite (Bereich 1)
+  featuredOnHomepage Boolean @default(false) @map("featured_on_homepage")
+  /// Sortierung innerhalb der hervorgehobenen Startseiten-Kurse (ASC)
+  homepageSortOrder  Int     @default(100) @map("homepage_sort_order")
+
+  coverStorageKey String? @map("cover_storage_key")
+  coverFileName   String? @map("cover_file_name")
+
+  productId String?  @unique @map("product_id") @db.Uuid
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  /// Foren für Kursteilnehmer automatisch bereitstellen
+  forumsEnabled Boolean @default(false) @map("forums_enabled")
+
+  courseGroupId String? @map("course_group_id") @db.Uuid
+  courseGroup   CourseGroup? @relation(fields: [courseGroupId], references: [id], onDelete: SetNull)
+
+  courseSubgroupId String? @map("course_subgroup_id") @db.Uuid
+  courseSubgroup   CourseSubgroup? @relation(fields: [courseSubgroupId], references: [id], onDelete: SetNull)
+
+  publishedAt DateTime? @map("published_at")
+
+  modules          CourseModule[]
+  userAccess       UserCourseAccess[]
+  membershipRules  MembershipCourseRule[]
+  certificates     UserCourseCertificate[]
+  forums           Forum[]
+  reviews          CourseReview[]
+  productRecommendationLinks ProductRecommendationCourseLink[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([courseType])
+  @@index([sortOrder])
+  @@index([featuredOnHomepage, homepageSortOrder])
+  @@index([createdAt])
+  @@index([courseGroupId])
+  @@index([courseSubgroupId])
+  @@map("courses")
+}
+
+/// Pflichtmodul innerhalb eines Kurses
+model CourseModule {
+  id String @id @default(uuid()) @db.Uuid
+
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String? @db.Text
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  lessons CourseLesson[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([courseId])
+  @@index([courseId, sortOrder])
+  @@map("course_modules")
+}
+
+/// Pflichtlektion innerhalb eines Moduls
+model CourseLesson {
+  id String @id @default(uuid()) @db.Uuid
+
+  moduleId String       @map("module_id") @db.Uuid
+  module   CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  slug  String
+  title String
+  description String? @db.Text
+
+  lessonType CourseLessonType @map("lesson_type")
+  sortOrder  Int              @default(0) @map("sort_order")
+  durationMinutes Int? @map("duration_minutes")
+
+  textContent String? @db.Text @map("text_content")
+
+  /// Nur Vimeo-Video-ID (kein direkter URL-Leak)
+  vimeoVideoId String? @map("vimeo_video_id")
+
+  downloadStorageKey String? @map("download_storage_key")
+  downloadFileName   String? @map("download_file_name")
+
+  recipeId    String? @map("recipe_id") @db.Uuid
+  recipeTitle String? @map("recipe_title")
+  recipeContent Json? @map("recipe_content")
+
+  progress CourseLessonProgress[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([moduleId, slug])
+  @@index([moduleId])
+  @@index([moduleId, sortOrder])
+  @@map("course_lessons")
+}
+
+/// Fortschritt pro Nutzer und Lektion
+model CourseLessonProgress {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lessonId String       @map("lesson_id") @db.Uuid
+  lesson   CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  lastViewedAt DateTime? @map("last_viewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("course_lesson_progress")
+}
+
+/// Kurszugriff auf Nutzerebene (Kauf, Buchhaltung, Admin, Mitgliedschaft)
+model UserCourseAccess {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  status CourseAccessStatus @default(active)
+  source CourseAccessSource
+
+  grantedAt DateTime? @map("granted_at")
+  expiresAt DateTime? @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  note String? @db.Text
+
+  courseAccessId String? @unique @map("course_access_id") @db.Uuid
+
+  adminGrantedByUserId String? @map("admin_granted_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, courseId])
+  @@index([status])
+  @@index([courseId])
+  @@map("user_course_access")
+}
+
+/// Mitgliedschafts-Regel: Bonuskurs für Jahresabo o. ä.
+model MembershipCourseRule {
+  id String @id @default(uuid()) @db.Uuid
+
+  membershipRole MembershipRole @map("membership_role")
+  courseId       String         @map("course_id") @db.Uuid
+  course         Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  /// null = alle Abrechnungsperioden, yearly = nur Jahresmitgliedschaft
+  billingPeriod BillingPeriod? @map("billing_period")
+
+  active Boolean @default(true)
+  note   String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([membershipRole, courseId])
+  @@index([membershipRole])
+  @@index([courseId])
+  @@map("membership_course_rules")
+}
+
+/// Nutzer-Zertifikat (vorbereitet, nach Kursabschluss freischaltbar)
+model UserCourseCertificate {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  certificateType CourseCertificateType @map("certificate_type")
+  status          UserCertificateStatus @default(locked)
+
+  issuedAt DateTime? @map("issued_at")
+  certificateNumber String? @unique @map("certificate_number")
+
+  verificationToken String? @unique @map("verification_token")
+  verificationUrl   String? @map("verification_url")
+  pdfGeneratedAt    DateTime? @map("pdf_generated_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  publicShare PublicShare?
+
+  @@unique([userId, courseId])
+  @@index([status])
+  @@index([certificateNumber])
+  @@map("user_course_certificates")
+}
+
+// =============================================================================
+// Zertifikate (Schritt 22)
+// =============================================================================
+
+/// Zähler für fortlaufende Zertifikatsnummern
+model CertificateSequence {
+  id String @id @default("default")
+
+  sequenceYear  Int @map("sequence_year")
+  currentNumber Int @default(0) @map("current_number")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("certificate_sequences")
+}
+
+/// Editierbare Urkunden-/Zertifikatsvorlage.
+/// id ist der Nachweistyp: "certificate" (Zertifikat) oder "participation" (Teilnahmeurkunde).
+model CertificateTemplate {
+  id String @id @default("certificate")
+
+  /// Seitenformat: "portrait" (DIN A4 hoch) oder "landscape" (DIN A4 quer)
+  format String @default("landscape")
+
+  backgroundStorageKey String? @map("background_storage_key")
+  backgroundFileName   String? @map("background_file_name")
+
+  instructorName  String @default("Ralf Hermanski") @map("instructor_name")
+  instructorTitle String @default("Fleischermeister seit 1994") @map("instructor_title")
+
+  /// Platzhalter-Konfiguration (Position, Schrift, Farbe) in Prozent der Seite
+  placeholders Json @default("[]")
+
+  /// Frei editierbare Textelemente (Rechtshinweise, Fußnoten) in Prozent der Seite
+  textFields Json @default("[]") @map("text_fields")
+
+  /// QR-Code-Konfiguration (Position, Größe in Prozent)
+  qrConfig Json @default("{\"x\":82,\"y\":72,\"size\":12}") @map("qr_config")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("certificate_templates")
+}
+
+// -----------------------------------------------------------------------------
+// Kursbewertungen & Foren (Schritt 31)
+// -----------------------------------------------------------------------------
+
+enum CourseReviewStatus {
+  pending
+  approved
+  rejected
+}
+
+enum ForumType {
+  course
+  mini_course_global
+  general
+  membership
+}
+
+enum ForumReadAccess {
+  public
+  registered
+  course_access
+  membership
+  mini_course_access
+}
+
+enum ForumPurpose {
+  introduction
+  qa
+  improvements
+  custom
+}
+
+/// Bewertung eines Kurses durch einen Teilnehmer
+model CourseReview {
+  id String @id @default(uuid()) @db.Uuid
+
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rating     Int
+  reviewText String? @db.Text @map("review_text")
+  status     CourseReviewStatus @default(pending)
+
+  displayNameSnapshot String? @map("display_name_snapshot")
+  avatarUrlSnapshot   String? @map("avatar_url_snapshot")
+
+  featuredOnHomepage      Boolean @default(false) @map("featured_on_homepage")
+  showMembershipSnapshot  Boolean @default(false) @map("show_membership_snapshot")
+  membershipLabelSnapshot String? @map("membership_label_snapshot")
+  courseTitleSnapshot     String? @map("course_title_snapshot")
+
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewedById    String?   @map("reviewed_by_id") @db.Uuid
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  publishedAt     DateTime? @map("published_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([courseId, userId])
+  @@index([courseId, status])
+  @@index([status])
+  @@index([status, featuredOnHomepage])
+  @@map("course_reviews")
+}
+
+enum PlatformReviewFocus {
+  platform
+  courses
+  recipes
+  tools
+  community
+  support
+}
+
+enum PlatformReviewModerationStatus {
+  pending
+  approved
+  rejected
+  archived
+}
+
+enum MemberCountDisplayMode {
+  exact
+  rounded
+  hidden
+}
+
+enum HomepageReviewsEmptyMode {
+  message
+  hidden
+}
+
+enum PlatformReviewEligibilityRule {
+  days_registered
+  course_started
+  recipe_saved
+  tool_used
+}
+
+/// Bewertung der gesamten Plattform durch ein Mitglied
+model PlatformReview {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  rating  Int
+  title   String? @db.VarChar(100)
+  content String  @db.Text
+  focus   PlatformReviewFocus @default(platform)
+
+  moderationStatus PlatformReviewModerationStatus @default(pending) @map("moderation_status")
+  publicConsent    Boolean @default(false) @map("public_consent")
+  showMembership   Boolean @default(false) @map("show_membership")
+
+  featuredOnHomepage Boolean @default(false) @map("featured_on_homepage")
+
+  displayNameSnapshot     String? @map("display_name_snapshot")
+  avatarUrlSnapshot       String? @map("avatar_url_snapshot")
+  membershipLabelSnapshot String? @map("membership_label_snapshot")
+
+  submittedAt     DateTime  @default(now()) @map("submitted_at")
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewedById    String?   @map("reviewed_by_id") @db.Uuid
+  reviewedBy      User?     @relation("PlatformReviewModerator", fields: [reviewedById], references: [id], onDelete: SetNull)
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  publishedAt     DateTime? @map("published_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId])
+  @@index([moderationStatus])
+  @@index([moderationStatus, featuredOnHomepage])
+  @@map("platform_reviews")
+}
+
+/// Einstellungen für den Startseiten-Bereich „Stimmen aus der Community“
+model HomepageCommunityReviewsSettings {
+  id String @id @default("default")
+
+  memberCountDisplay   MemberCountDisplayMode @default(exact) @map("member_count_display")
+  showAverageRating    Boolean @default(true) @map("show_average_rating")
+  minReviewsForAverage Int     @default(5) @map("min_reviews_for_average")
+  emptyStateMode       HomepageReviewsEmptyMode @default(message) @map("empty_state_mode")
+  eligibilityRule      PlatformReviewEligibilityRule @default(days_registered) @map("eligibility_rule")
+  minRegistrationDays  Int     @default(7) @map("min_registration_days")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("homepage_community_reviews_settings")
+}
+
+/// Forum (Kursforum, globales Minikurs-Forum oder allgemein)
+model Forum {
+  id String @id @default(uuid()) @db.Uuid
+
+  title       String
+  slug        String @unique
+  description String? @db.Text
+
+  forumType    ForumType    @map("forum_type")
+  forumPurpose ForumPurpose @default(custom) @map("forum_purpose")
+
+  /// Leseregel (ergänzt forumType — Admin kann für general überschreiben)
+  readAccess ForumReadAccess @default(registered) @map("read_access")
+
+  /// Schreiben erlaubt (bei false nur Lesen)
+  writeEnabled Boolean @default(true) @map("write_enabled")
+
+  /// Erforderliche Mitgliedschaftsrolle (forumType = membership)
+  requiredMembershipRole MembershipRole? @map("required_membership_role")
+
+  courseId String? @map("course_id") @db.Uuid
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  threads ForumThread[]
+  communityChallenges CommunityChallenge[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([courseId, forumPurpose])
+  @@index([forumType])
+  @@index([courseId])
+  @@index([isActive, sortOrder])
+  @@map("forums")
+}
+
+/// Forum-Thread (Thema)
+model ForumThread {
+  id String @id @default(uuid()) @db.Uuid
+
+  forumId String @map("forum_id") @db.Uuid
+  forum   Forum  @relation(fields: [forumId], references: [id], onDelete: Cascade)
+
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  title String
+  slug  String
+  body  String @db.Text
+
+  isLocked Boolean @default(false) @map("is_locked")
+
+  displayNameSnapshot String? @map("display_name_snapshot")
+  avatarUrlSnapshot   String? @map("avatar_url_snapshot")
+  authorRoleBadge     String? @map("author_role_badge")
+
+  posts ForumPost[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([forumId, slug])
+  @@index([forumId, createdAt])
+  @@map("forum_threads")
+}
+
+/// Forum-Beitrag (Antwort auf Thread)
+model ForumPost {
+  id String @id @default(uuid()) @db.Uuid
+
+  threadId String      @map("thread_id") @db.Uuid
+  thread   ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  body String @db.Text
+
+  displayNameSnapshot String? @map("display_name_snapshot")
+  avatarUrlSnapshot   String? @map("avatar_url_snapshot")
+  authorRoleBadge     String? @map("author_role_badge")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([threadId, createdAt])
+  @@map("forum_posts")
+}
+
+/// Systemweite Einstellungen (z. B. globale Minikurs-Foren)
+model SystemSetting {
+  key   String @id
+  value String @db.Text
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+/// Wartungsmodus — Singleton (id = "default")
+model MaintenanceSettings {
+  id String @id @default("default")
+
+  enabled Boolean @default(false)
+  title   String  @default("ALLES WURST")
+  text    String  @default("🔧 Wir arbeiten für euch an Verbesserungen\n\nAktuell überarbeiten wir unsere Plattform,\nerstellen neue Inhalte und verbessern bestehende Funktionen.\n\nWir sind bald wieder für euch da.\n\nVielen Dank für eure Geduld.\n\nEuer Alles-Wurst-Team") @db.Text
+  showLogo Boolean @default(true) @map("show_logo")
+  logoStorageKey     String? @map("logo_storage_key")
+  logoFileName       String? @map("logo_file_name")
+  logoMimeType       String? @map("logo_mime_type")
+  backgroundStorageKey String? @map("background_storage_key")
+  backgroundFileName   String? @map("background_file_name")
+  backgroundMimeType   String? @map("background_mime_type")
+  countdownEnabled Boolean @default(false) @map("countdown_enabled")
+  endDate DateTime? @map("end_date")
+  /// "503" oder "200"
+  httpStatus String @default("503") @map("http_status")
+  newsletterEnabled Boolean @default(true) @map("newsletter_enabled")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("maintenance_settings")
+}
+
+/// Newsletter-Anmeldungen von der Wartungsseite
+model MaintenanceNewsletterSignup {
+  id String @id @default(uuid()) @db.Uuid
+
+  email  String
+  source String @default("maintenance")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([email])
+  @@map("maintenance_newsletter_signups")
+}
+
+// -----------------------------------------------------------------------------
+// Kursgruppen & Untergruppen (Schritt 32)
+// -----------------------------------------------------------------------------
+
+/// Hauptgruppe für Kurskatalog und Startseite
+model CourseGroup {
+  id String @id @default(uuid()) @db.Uuid
+
+  name             String
+  slug             String @unique
+  shortDescription String? @db.Text @map("short_description")
+  imageStorageKey  String? @map("image_storage_key")
+  imageFileName    String? @map("image_file_name")
+  sortOrder        Int     @default(0) @map("sort_order")
+  isActive         Boolean @default(true) @map("is_active")
+
+  subgroups CourseSubgroup[]
+  courses   Course[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("course_groups")
+}
+
+/// Untergruppe innerhalb einer Hauptgruppe
+model CourseSubgroup {
+  id String @id @default(uuid()) @db.Uuid
+
+  courseGroupId String      @map("course_group_id") @db.Uuid
+  courseGroup   CourseGroup @relation(fields: [courseGroupId], references: [id], onDelete: Cascade)
+
+  name             String
+  slug             String
+  shortDescription String? @db.Text @map("short_description")
+  imageStorageKey  String? @map("image_storage_key")
+  imageFileName    String? @map("image_file_name")
+  sortOrder        Int     @default(0) @map("sort_order")
+  isActive         Boolean @default(true) @map("is_active")
+
+  courses Course[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([courseGroupId, slug])
+  @@index([courseGroupId, isActive, sortOrder])
+  @@map("course_subgroups")
+}
+
+// -----------------------------------------------------------------------------
+// Support-Tickets
+// -----------------------------------------------------------------------------
+
+enum SupportTicketStatus {
+  open
+  in_progress
+  waiting_user
+  resolved
+  closed
+}
+
+enum SupportTicketPriority {
+  normal
+  important
+  urgent
+}
+
+enum SupportTicketWaitingOn {
+  admin
+  user
+}
+
+enum SupportTicketEventType {
+  created
+  status_changed
+  assigned
+  reassigned
+  public_reply
+  internal_note
+  user_reply
+  resolved
+  closed
+  reopened
+  rating
+  attachment_added
+  reminder_sent
+  escalated
+  anonymized
+}
+
+enum SupportTicketMessageAuthorType {
+  user
+  staff
+}
+
+/// Admin-verwaltete Ticket-Kategorien
+model SupportTicketCategory {
+  id String @id @default(uuid()) @db.Uuid
+
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  sortOrder   Int     @default(0) @map("sort_order")
+  isActive    Boolean @default(true) @map("is_active")
+  isMasterSupport Boolean @default(false) @map("is_master_support")
+
+  tickets   SupportTicket[]
+  templates SupportReplyTemplate[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("support_ticket_categories")
+}
+
+/// Support-Ticket
+model SupportTicket {
+  id String @id @default(uuid()) @db.Uuid
+
+  ticketNumber String @unique @map("ticket_number")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("SupportTicketCreator", fields: [userId], references: [id], onDelete: Cascade)
+
+  categoryId String               @map("category_id") @db.Uuid
+  category   SupportTicketCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  assignedToUserId String? @map("assigned_to_user_id") @db.Uuid
+  assignedTo       User?   @relation("SupportTicketAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  subject  String
+  status   SupportTicketStatus   @default(open)
+  priority SupportTicketPriority @default(normal)
+  waitingOn SupportTicketWaitingOn @default(admin) @map("waiting_on")
+
+  isOverdue           Boolean @default(false) @map("is_overdue")
+  unassignedAlertSent Boolean @default(false) @map("unassigned_alert_sent")
+
+  lastStaffReplyAt DateTime? @map("last_staff_reply_at")
+  lastUserReplyAt  DateTime? @map("last_user_reply_at")
+  resolvedAt       DateTime? @map("resolved_at")
+  closedAt         DateTime? @map("closed_at")
+  userReminderAt   DateTime? @map("user_reminder_at")
+  autoCloseAt      DateTime? @map("auto_close_at")
+
+  userUnreadCount Int     @default(0) @map("user_unread_count")
+  userHasReminder Boolean @default(false) @map("user_has_reminder")
+
+  rating        Int?    @map("rating")
+  ratingComment String? @map("rating_comment") @db.Text
+  closureNote   String? @map("closure_note") @db.Text
+
+  anonymizedAt DateTime? @map("anonymized_at")
+
+  withdrawalRequestId String? @unique @map("withdrawal_request_id") @db.Uuid
+  withdrawalRequest   WithdrawalRequest? @relation(fields: [withdrawalRequestId], references: [id], onDelete: SetNull)
+
+  privacyRequestId String? @unique @map("privacy_request_id") @db.Uuid
+  privacyRequest   PrivacyRequest? @relation(fields: [privacyRequestId], references: [id], onDelete: SetNull)
+
+  messages      SupportTicketMessage[]
+  internalNotes SupportTicketInternalNote[]
+  attachments   SupportTicketAttachment[]
+  events        SupportTicketEvent[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status, createdAt])
+  @@index([assignedToUserId, status])
+  @@index([status, priority, createdAt])
+  @@index([isOverdue, status])
+  @@map("support_tickets")
+}
+
+/// Öffentliche Nachricht im Ticketverlauf (User + Staff)
+model SupportTicketMessage {
+  id String @id @default(uuid()) @db.Uuid
+
+  ticketId String        @map("ticket_id") @db.Uuid
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  authorType SupportTicketMessageAuthorType @map("author_type")
+  body       String @db.Text
+
+  isReadByUser Boolean @default(false) @map("is_read_by_user")
+
+  attachments SupportTicketAttachment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_messages")
+}
+
+/// Interne Notiz — nur für Staff sichtbar
+model SupportTicketInternalNote {
+  id String @id @default(uuid()) @db.Uuid
+
+  ticketId String        @map("ticket_id") @db.Uuid
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  body String @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_internal_notes")
+}
+
+/// Dateianhang an Ticket oder Nachricht
+model SupportTicketAttachment {
+  id String @id @default(uuid()) @db.Uuid
+
+  ticketId String        @map("ticket_id") @db.Uuid
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  messageId String?              @map("message_id") @db.Uuid
+  message   SupportTicketMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  uploadedByUserId String @map("uploaded_by_user_id") @db.Uuid
+  uploadedBy       User   @relation("SupportAttachmentUploader", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+
+  storageKey String @map("storage_key")
+  fileName   String @map("file_name")
+  mimeType   String @map("mime_type")
+  sizeBytes  Int    @map("size_bytes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("support_ticket_attachments")
+}
+
+/// Audit-Log / Ticketverlauf
+model SupportTicketEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  ticketId String        @map("ticket_id") @db.Uuid
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  actor       User?   @relation("SupportTicketEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  eventType SupportTicketEventType @map("event_type")
+  summary   String @db.Text
+  metadata  Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_events")
+}
+
+/// Antwortvorlagen für Staff
+model SupportReplyTemplate {
+  id String @id @default(uuid()) @db.Uuid
+
+  title    String
+  body     String @db.Text
+  sortOrder Int   @default(0) @map("sort_order")
+  isActive Boolean @default(true) @map("is_active")
+
+  categoryId String?               @map("category_id") @db.Uuid
+  category   SupportTicketCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("support_reply_templates")
+}
+
+/// Zähler für Ticketnummern pro Jahr (AW-T-2026-000001)
+model SupportTicketCounter {
+  year       Int @id
+  lastNumber Int @default(0) @map("last_number")
+
+  @@map("support_ticket_counters")
+}
+
+// =============================================================================
+// Blog / Magazin
+// =============================================================================
+
+enum BlogPostStatus {
+  draft
+  scheduled
+  published
+  archived
+}
+
+enum BlogSearchIntent {
+  inform
+  learn
+  buy
+  compare
+  solve
+}
+
+/// Blog-Kategorie (Magazin-Rubrik)
+model BlogCategory {
+  id String @id @default(uuid()) @db.Uuid
+
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  sortOrder   Int     @default(0) @map("sort_order")
+  isActive    Boolean @default(true) @map("is_active")
+
+  posts BlogPost[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("blog_categories")
+}
+
+/// Schlagwort / Tag
+model BlogTag {
+  id String @id @default(uuid()) @db.Uuid
+
+  name String
+  slug String @unique
+
+  posts BlogPostTag[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("blog_tags")
+}
+
+model BlogPostTag {
+  postId String   @map("post_id") @db.Uuid
+  post   BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  tagId String  @map("tag_id") @db.Uuid
+  tag   BlogTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("blog_post_tags")
+}
+
+/// Themencluster (SEO / interne Verlinkung)
+model BlogTopicCluster {
+  id String @id @default(uuid()) @db.Uuid
+
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  sortOrder   Int     @default(0) @map("sort_order")
+  isActive    Boolean @default(true) @map("is_active")
+
+  posts BlogPostTopic[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("blog_topic_clusters")
+}
+
+model BlogPostTopic {
+  postId String   @map("post_id") @db.Uuid
+  post   BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  topicId String           @map("topic_id") @db.Uuid
+  topic   BlogTopicCluster @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  @@id([postId, topicId])
+  @@map("blog_post_topics")
+}
+
+/// Blogartikel / Magazin-Beitrag
+model BlogPost {
+  id String @id @default(uuid()) @db.Uuid
+
+  slug  String @unique
+  title String
+
+  excerpt String? @db.Text
+  summary String? @db.Text
+  body    String  @default("") @db.Text
+
+  status BlogPostStatus @default(draft)
+
+  authorUserId String @map("author_user_id") @db.Uuid
+  author       User   @relation("BlogPostAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  categoryId String?       @map("category_id") @db.Uuid
+  category   BlogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  focusKeyword       String? @map("focus_keyword")
+  secondaryKeywords  Json    @default("[]") @map("secondary_keywords")
+  longtailKeywords   Json    @default("[]") @map("longtail_keywords")
+  keywordNotes       String? @map("keyword_notes") @db.Text
+  searchIntent       BlogSearchIntent? @map("search_intent")
+  questionsToAnswer  Json    @default("[]") @map("questions_to_answer")
+  internalLinkNotes  String? @map("internal_link_notes") @db.Text
+
+  seoTitle       String? @map("seo_title")
+  metaDescription String? @map("meta_description") @db.Text
+  canonicalUrl   String? @map("canonical_url")
+
+  coverStorageKey String? @map("cover_storage_key")
+  coverFileName   String? @map("cover_file_name")
+  coverAltText    String? @map("cover_alt_text")
+  coverMimeType   String? @map("cover_mime_type")
+
+  faqItems         Json @default("[]") @map("faq_items")
+  definitionBoxes  Json @default("[]") @map("definition_boxes")
+  internalLinks    Json @default("[]") @map("internal_links")
+  relatedPostIds   Json @default("[]") @map("related_post_ids")
+  linkedCourseIds  Json @default("[]") @map("linked_course_ids")
+  linkedRecipeIds  Json @default("[]") @map("linked_recipe_ids")
+  ctaConfig        Json @default("{}") @map("cta_config")
+
+  reviewedByName String? @default("Ralf Hermanski, Fleischermeister") @map("reviewed_by_name")
+  expertNote     String? @map("expert_note") @db.Text
+  sourcesNote    String? @map("sources_note") @db.Text
+  disclaimerNote String? @default("Diese Inhalte dienen der allgemeinen Information und ersetzen keine individuelle Lebensmittelkontrolle oder Rechtsberatung.") @map("disclaimer_note") @db.Text
+
+  readingTimeMinutes Int @default(0) @map("reading_time_minutes")
+  viewCount          Int @default(0) @map("view_count")
+
+  robotsIndex  Boolean @default(true) @map("robots_index")
+  robotsFollow Boolean @default(true) @map("robots_follow")
+
+  ogTitle            String? @map("og_title")
+  ogDescription      String? @map("og_description") @db.Text
+  twitterTitle       String? @map("twitter_title")
+  twitterDescription String? @map("twitter_description") @db.Text
+  seoKeywords        Json    @default("[]") @map("seo_keywords")
+  seoTagsSuggested   Json    @default("[]") @map("seo_tags_suggested")
+  schemaJson         Json?   @map("schema_json")
+  internalLinkSuggestions Json @default("[]") @map("internal_link_suggestions")
+  seoScore           Int?    @map("seo_score")
+  readabilityScore   Int?    @map("readability_score")
+  lastSeoAnalysisAt  DateTime? @map("last_seo_analysis_at")
+  seoAnalysisDraft   Json?   @map("seo_analysis_draft")
+
+  publishedAt    DateTime? @map("published_at")
+  scheduledAt    DateTime? @map("scheduled_at")
+  contentUpdatedAt DateTime? @map("content_updated_at")
+  lastReviewedAt DateTime? @map("last_reviewed_at")
+
+  tags   BlogPostTag[]
+  topics BlogPostTopic[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+  @@index([authorUserId])
+  @@index([scheduledAt])
+  @@map("blog_posts")
+}
+
+// -----------------------------------------------------------------------------
+// Site-weites automatisches SEO (öffentliche Seiten, nicht Blog-Artikel)
+// -----------------------------------------------------------------------------
+
+enum PageSeoSource {
+  auto
+  manual
+}
+
+enum PageSeoPageType {
+  static
+  course
+  product
+  course_group
+  course_subgroup
+  blog_category
+  blog_tag
+}
+
+enum PageSeoGenerationStatus {
+  pending
+  queued
+  processing
+  pending_review
+  completed
+  failed
+  skipped
+  stale
+}
+
+model PageSeo {
+  id String @id @default(cuid())
+
+  routeKey String @unique @map("route_key")
+  path     String
+  pageType PageSeoPageType @map("page_type")
+  entityId String? @map("entity_id")
+
+  seoSource PageSeoSource @default(auto) @map("seo_source")
+
+  metaTitle       String? @map("meta_title")
+  metaDescription String? @map("meta_description") @db.Text
+  keywords        Json    @default("[]")
+
+  ogTitle       String? @map("og_title")
+  ogDescription String? @map("og_description") @db.Text
+  ogImage       String? @map("og_image")
+
+  twitterTitle       String? @map("twitter_title")
+  twitterDescription String? @map("twitter_description") @db.Text
+
+  canonicalUrl String? @map("canonical_url")
+  jsonLd       Json?   @map("json_ld")
+
+  aiSummary        String? @map("ai_summary") @db.Text
+  aiMainTopic      String? @map("ai_main_topic")
+  aiEntities       Json    @default("[]") @map("ai_entities")
+  aiAudience       String? @map("ai_audience")
+  aiExpertise      String? @map("ai_expertise")
+  semanticKeywords Json    @default("[]") @map("semantic_keywords")
+
+  /// KI-Vorschläge — werden erst nach Admin-Freigabe in die Live-Felder übernommen
+  seoDraft Json? @map("seo_draft")
+
+  contentHash          String? @map("content_hash")
+  lastGeneratedAt      DateTime? @map("last_generated_at")
+  lastContentChangeAt  DateTime? @map("last_content_change_at")
+  generationStatus     PageSeoGenerationStatus @default(pending) @map("generation_status")
+  errorMessage         String? @map("error_message") @db.Text
+
+  isPublished Boolean @default(true) @map("is_published")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([pageType])
+  @@index([generationStatus])
+  @@index([seoSource])
+  @@map("page_seo")
+}
+
+model PageSeoSettings {
+  id String @id @default("default")
+
+  autoGenerateEnabled Boolean @default(true) @map("auto_generate_enabled")
+  autoUpdateOnChange  Boolean @default(true) @map("auto_update_on_change")
+  onlyPublishedPages  Boolean @default(true) @map("only_published_pages")
+  maxApiCallsPerDay   Int     @default(50) @map("max_api_calls_per_day")
+  apiCallsToday       Int     @default(0) @map("api_calls_today")
+  apiCallsResetAt     DateTime? @map("api_calls_reset_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("page_seo_settings")
+}
+
+model PageSeoQueueJob {
+  id String @id @default(cuid())
+
+  routeKey String @map("route_key")
+  action   String @default("generate")
+  priority Int    @default(0)
+  status   String @default("pending")
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(3) @map("max_attempts")
+  errorMessage String? @map("error_message") @db.Text
+
+  scheduledAt DateTime @default(now()) @map("scheduled_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([status, scheduledAt])
+  @@index([routeKey])
+  @@map("page_seo_queue_jobs")
+}
+
+// =============================================================================
+// Analytics — First-Party, consent-basiert (DSGVO/TDDDG)
+// =============================================================================
+
+enum AnalyticsConsentAction {
+  granted
+  denied
+  updated
+  revoked
+}
+
+enum AnalyticsTrackingLevel {
+  basic
+  statistics
+}
+
+model AnalyticsConsentLog {
+  id String @id @default(cuid())
+
+  statisticsConsent Boolean @default(false) @map("statistics_consent")
+  marketingConsent  Boolean @default(false) @map("marketing_consent")
+  action            AnalyticsConsentAction
+
+  ipHash String? @map("ip_hash")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("analytics_consent_log")
+}
+
+model AnalyticsSession {
+  id String @id @default(cuid())
+
+  sessionKey String @unique @map("session_key")
+
+  userId String? @map("user_id") @db.Uuid
+
+  entryPage  String? @map("entry_page")
+  exitPage   String? @map("exit_page")
+  deviceType String? @map("device_type")
+  browserFamily String? @map("browser_family")
+  countryCode   String? @map("country_code")
+  referrerDomain String? @map("referrer_domain")
+
+  pageviewCount   Int @default(0) @map("pageview_count")
+  durationSeconds Int @default(0) @map("duration_seconds")
+
+  startedAt      DateTime  @default(now()) @map("started_at")
+  lastActivityAt DateTime  @default(now()) @map("last_activity_at")
+  endedAt        DateTime? @map("ended_at")
+
+  events AnalyticsEvent[]
+
+  @@index([userId])
+  @@index([startedAt])
+  @@index([lastActivityAt])
+  @@map("analytics_sessions")
+}
+
+model AnalyticsEvent {
+  id String @id @default(cuid())
+
+  sessionId String?          @map("session_id")
+  session   AnalyticsSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  userId String? @map("user_id") @db.Uuid
+
+  trackingLevel AnalyticsTrackingLevel @default(statistics) @map("tracking_level")
+  eventType     String                 @map("event_type")
+
+  pagePath       String? @map("page_path")
+  pageType       String? @map("page_type")
+  referrerDomain String? @map("referrer_domain")
+  deviceType     String? @map("device_type")
+  browserFamily  String? @map("browser_family")
+  countryCode    String? @map("country_code")
+
+  metadataJson Json? @map("metadata_json")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([eventType])
+  @@index([pagePath])
+  @@index([createdAt])
+  @@index([sessionId])
+  @@index([trackingLevel])
+  @@map("analytics_events")
+}
+
+model AnalyticsDailyPageStat {
+  id String @id @default(cuid())
+
+  statDate DateTime @map("stat_date") @db.Date
+  pagePath String   @map("page_path")
+  pageType String   @default("page") @map("page_type")
+
+  basicViews      Int @default(0) @map("basic_views")
+  statisticsViews Int @default(0) @map("statistics_views")
+  uniqueSessions  Int @default(0) @map("unique_sessions")
+
+  totalDurationSeconds Int @default(0) @map("total_duration_seconds")
+  durationSamples      Int @default(0) @map("duration_samples")
+  totalScrollDepth     Int @default(0) @map("total_scroll_depth")
+  scrollSamples        Int @default(0) @map("scroll_samples")
+  bounces              Int @default(0)
+
+  @@unique([statDate, pagePath])
+  @@index([statDate])
+  @@index([pagePath])
+  @@map("analytics_daily_page_stats")
+}
+
+model AnalyticsDailyFunnelStat {
+  id String @id @default(cuid())
+
+  statDate  DateTime @map("stat_date") @db.Date
+  funnelId  String   @map("funnel_id")
+  stepKey   String   @map("step_key")
+  stepOrder Int      @map("step_order")
+
+  enteredCount   Int @default(0) @map("entered_count")
+  completedCount Int @default(0) @map("completed_count")
+  droppedCount   Int @default(0) @map("dropped_count")
+
+  @@unique([statDate, funnelId, stepKey])
+  @@index([statDate])
+  @@index([funnelId])
+  @@map("analytics_daily_funnel_stats")
+}
+
+model AnalyticsDailyMetric {
+  id String @id @default(cuid())
+
+  statDate DateTime @map("stat_date") @db.Date
+  metricKey String  @map("metric_key")
+
+  value Int @default(0)
+
+  @@unique([statDate, metricKey])
+  @@index([statDate])
+  @@map("analytics_daily_metrics")
+}
+
+// =============================================================================
+// Platform Text Management — zentrale UI-/System-Texte
+// =============================================================================
+
+enum PlatformTextFormat {
+  plain
+  markdown
+  html
+}
+
+enum PlatformTextStatus {
+  standard
+  draft
+  published
+  archived
+}
+
+/// Zentral verwalteter Plattformtext (Key = eindeutiger Schlüssel)
+model PlatformText {
+  key            String             @id
+  category       String
+  locale         String             @default("de")
+  value          String             @db.Text
+  defaultValue   String             @map("default_value") @db.Text
+  draftValue     String?            @map("draft_value") @db.Text
+  status         PlatformTextStatus @default(published)
+  publishedAt    DateTime?          @map("published_at")
+  publishedBy    String?            @map("published_by") @db.Uuid
+  pagePath       String?            @map("page_path")
+  contentType    String             @default("text") @map("content_type")
+  maxLength      Int?               @map("max_length")
+  allowRichText  Boolean            @default(false) @map("allow_rich_text")
+  label          String?
+  description    String?            @db.Text
+  format         PlatformTextFormat @default(plain)
+  version        Int                @default(1)
+  updatedBy      String?            @map("updated_by") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  versions PlatformTextVersion[]
+  changes  PlatformTextChangeLog[]
+  elements EditablePageElement[]
+
+  @@index([category])
+  @@index([locale])
+  @@index([pagePath])
+  @@index([status])
+  @@map("platform_texts")
+}
+
+/// Versionierung — Snapshot bei jeder Änderung
+model PlatformTextVersion {
+  id         String   @id @default(uuid()) @db.Uuid
+  textKey    String   @map("text_key")
+  version    Int
+  value      String   @db.Text
+  changedBy  String?  @map("changed_by") @db.Uuid
+  changeNote String?  @map("change_note")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  text PlatformText @relation(fields: [textKey], references: [key], onDelete: Cascade)
+
+  @@unique([textKey, version])
+  @@index([textKey])
+  @@map("platform_text_versions")
+}
+
+/// Änderungsprotokoll
+model PlatformTextChangeLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  textKey   String   @map("text_key")
+  action    String
+  oldValue  String?  @map("old_value") @db.Text
+  newValue  String?  @map("new_value") @db.Text
+  userId    String?  @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  text PlatformText @relation(fields: [textKey], references: [key], onDelete: Cascade)
+
+  @@index([textKey])
+  @@index([createdAt])
+  @@map("platform_text_change_logs")
+}
+
+/// Registrierte bearbeitbare Seite im visuellen Editor
+model EditablePage {
+  id        String   @id
+  name      String
+  path      String
+  category  String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  elements  EditablePageElement[]
+  releases  PageContentRelease[]
+  sessions  PageEditorSession[]
+
+  @@index([category])
+  @@index([path])
+  @@map("editable_pages")
+}
+
+/// Zuordnung Textschlüssel → Seite + Elementtyp
+model EditablePageElement {
+  id          String  @id @default(uuid()) @db.Uuid
+  pageId      String  @map("page_id")
+  textKey     String  @map("text_key")
+  elementType String  @default("text") @map("element_type")
+  label       String
+  sortOrder   Int     @default(0) @map("sort_order")
+  enabled     Boolean @default(true)
+
+  page EditablePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  text PlatformText @relation(fields: [textKey], references: [key], onDelete: Cascade)
+
+  @@unique([pageId, textKey])
+  @@index([pageId])
+  @@map("editable_page_elements")
+}
+
+/// Veröffentlichungs-Lauf für eine Seite
+model PageContentRelease {
+  id          String   @id @default(uuid()) @db.Uuid
+  pageId      String   @map("page_id")
+  version     Int      @default(1)
+  status      String   @default("published")
+  createdBy   String?  @map("created_by") @db.Uuid
+  publishedBy String?  @map("published_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  page EditablePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+  @@map("page_content_releases")
+}
+
+/// Kurzlebige Editor-Vorschau-Session (signiert)
+model PageEditorSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  pageId    String   @map("page_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  page EditablePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("page_editor_sessions")
+}
+
+// -----------------------------------------------------------------------------
+// Wissensdatenbank / FAQ (Hilfe-Center)
+// -----------------------------------------------------------------------------
+
+enum KnowledgeBaseArticleStatus {
+  draft
+  published
+  archived
+}
+
+enum KnowledgeBaseVisibility {
+  public
+  members
+}
+
+model KnowledgeBaseCategory {
+  id String @id @default(uuid()) @db.Uuid
+
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  sortOrder   Int     @default(0) @map("sort_order")
+  isActive    Boolean @default(true) @map("is_active")
+
+  articles KnowledgeBaseArticle[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("knowledge_base_categories")
+}
+
+model KnowledgeBaseArticle {
+  id String @id @default(uuid()) @db.Uuid
+
+  slug    String @unique
+  title   String
+  summary String? @db.Text
+  content String  @db.Text
+
+  categoryId String               @map("category_id") @db.Uuid
+  category   KnowledgeBaseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  keywords   String[] @default([])
+  status     KnowledgeBaseArticleStatus @default(draft)
+  visibility KnowledgeBaseVisibility    @default(public)
+  sortOrder  Int                        @default(0) @map("sort_order")
+  viewCount  Int                        @default(0) @map("view_count")
+
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, sortOrder])
+  @@index([categoryId, status])
+  @@map("knowledge_base_articles")
+}
+
+model KnowledgeBaseSearchLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  query        String
+  resultCount  Int     @map("result_count")
+  hadResults   Boolean @map("had_results")
+  userId       String? @map("user_id") @db.Uuid
+  sourcePage   String? @map("source_page")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([query])
+  @@map("knowledge_base_search_logs")
+}
+
+// ── Social Media ─────────────────────────────────────────────────────────────
+
+enum SocialMediaPlatform {
+  TIKTOK
+  INSTAGRAM
+  FACEBOOK
+  YOUTUBE
+}
+
+enum SocialMediaIntegrationMode {
+  API
+  EMBED
+  MANUAL
+  DISABLED
+}
+
+enum SocialMediaPostSource {
+  API
+  MANUAL
+}
+
+enum SocialMediaPostType {
+  IMAGE
+  VIDEO
+  REEL
+  SHORT
+  POST
+  LIVE
+  CAROUSEL
+}
+
+enum SocialMediaConnectionStatus {
+  NOT_CONFIGURED
+  CONNECTED
+  TOKEN_EXPIRED
+  ERROR
+  DISABLED
+}
+
+enum SocialMediaSyncStatus {
+  RUNNING
+  SUCCESS
+  WARNING
+  FAILED
+}
+
+enum SocialMediaTagSource {
+  AUTO
+  MANUAL
+  MIXED
+}
+
+model SocialMediaChannel {
+  id String @id @default(uuid()) @db.Uuid
+
+  platform           SocialMediaPlatform
+  name               String
+  publicName         String?  @map("public_name")
+  handle             String?
+  profileUrl         String?  @map("profile_url")
+  externalChannelId  String?  @map("external_channel_id")
+  description        String?
+  icon               String?
+  coverImageUrl      String?  @map("cover_image_url")
+
+  active             Boolean  @default(true)
+  showOnHomepage     Boolean  @default(true) @map("show_on_homepage")
+  displayOrder       Int      @default(0) @map("display_order")
+
+  integrationMode    SocialMediaIntegrationMode @default(MANUAL) @map("integration_mode")
+  connectionStatus   SocialMediaConnectionStatus @default(NOT_CONFIGURED) @map("connection_status")
+
+  ctaLabel           String?  @map("cta_label")
+  ctaUrl             String?  @map("cta_url")
+
+  followerCount          Int?     @map("follower_count")
+  followerCountUpdatedAt DateTime? @map("follower_count_updated_at")
+  showFollowerCount      Boolean  @default(false) @map("show_follower_count")
+
+  channelKeywords    String[] @default([]) @map("channel_keywords")
+  tagSource          SocialMediaTagSource @default(AUTO) @map("tag_source")
+  manualTags         String[] @default([]) @map("manual_tags")
+
+  featuredPostId     String? @map("featured_post_id") @db.Uuid
+
+  lastSyncedAt       DateTime? @map("last_synced_at")
+  lastErrorAt        DateTime? @map("last_error_at")
+  lastErrorMessage   String?   @map("last_error_message")
+
+  syncIntervalMinutes Int @default(120) @map("sync_interval_minutes")
+
+  isTestData Boolean @default(false) @map("is_test_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  credentials SocialMediaCredential[]
+  posts       SocialMediaPost[]
+  syncLogs    SocialMediaSyncLog[]
+  featuredPost SocialMediaPost? @relation("FeaturedPost", fields: [featuredPostId], references: [id], onDelete: SetNull)
+
+  @@unique([platform, externalChannelId])
+  @@index([active, showOnHomepage, displayOrder])
+  @@map("social_media_channels")
+}
+
+model SocialMediaCredential {
+  id String @id @default(uuid()) @db.Uuid
+
+  channelId       String @map("channel_id") @db.Uuid
+  channel         SocialMediaChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  credentialType  String @map("credential_type")
+  encryptedValue  String @map("encrypted_value")
+  expiresAt       DateTime? @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([channelId, credentialType])
+  @@map("social_media_credentials")
+}
+
+model SocialMediaPost {
+  id String @id @default(uuid()) @db.Uuid
+
+  channelId   String @map("channel_id") @db.Uuid
+  channel     SocialMediaChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  externalId  String? @map("external_id")
+  sourceType  SocialMediaPostSource @default(MANUAL) @map("source_type")
+  postType    SocialMediaPostType   @default(POST) @map("post_type")
+
+  title         String?
+  content       String?
+  thumbnailUrl  String? @map("thumbnail_url")
+  localThumbnailUrl String? @map("local_thumbnail_url")
+  mediaUrl      String? @map("media_url")
+  permalink     String?
+  tags          String[] @default([])
+
+  publishedAt DateTime? @map("published_at")
+  importedAt  DateTime  @default(now()) @map("imported_at")
+
+  active          Boolean @default(true)
+  featured        Boolean @default(false)
+  showOnHomepage  Boolean @default(false) @map("show_on_homepage")
+  displayOrder    Int     @default(0) @map("display_order")
+
+  isManualLocked  Boolean @default(false) @map("is_manual_locked")
+  isUnavailable   Boolean @default(false) @map("is_unavailable")
+  isTestData      Boolean @default(false) @map("is_test_data")
+
+  rawMetadata Json? @map("raw_metadata")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  featuredForChannels SocialMediaChannel[] @relation("FeaturedPost")
+
+  @@unique([channelId, externalId])
+  @@index([channelId, active, showOnHomepage])
+  @@index([publishedAt])
+  @@map("social_media_posts")
+}
+
+model SocialMediaSyncLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  channelId String? @map("channel_id") @db.Uuid
+  channel   SocialMediaChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  platform  SocialMediaPlatform?
+
+  status        SocialMediaSyncStatus
+  startedAt     DateTime @default(now()) @map("started_at")
+  finishedAt    DateTime? @map("finished_at")
+
+  foundCount    Int @default(0) @map("found_count")
+  createdCount  Int @default(0) @map("created_count")
+  updatedCount  Int @default(0) @map("updated_count")
+  skippedCount  Int @default(0) @map("skipped_count")
+
+  errorCode     String? @map("error_code")
+  errorMessage  String? @map("error_message")
+
+  triggeredBy         String @default("cron") @map("triggered_by")
+  triggeredByUserId   String? @map("triggered_by_user_id") @db.Uuid
+
+  @@index([startedAt])
+  @@index([platform, status])
+  @@map("social_media_sync_logs")
+}
+
+// ── Community Challenges ─────────────────────────────────────────────────────
+
+enum CommunityChallengeStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  VOTING
+  COMPLETED
+  ARCHIVED
+}
+
+enum ChallengeSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  WINNER
+}
+
+enum ChallengeVotingMode {
+  ADMIN_ONLY
+  JURY
+  COMMUNITY
+  MIXED
+}
+
+enum ChallengePopupState {
+  SEEN
+  REMIND_LATER
+  DISMISSED
+  PARTICIPATING
+  SUBMITTED
+}
+
+enum ChallengeNotificationType {
+  PUBLISHED
+  ENDS_IN_7_DAYS
+  ENDS_IN_2_DAYS
+  DRAFT_REMINDER
+  SUBMITTED
+  APPROVED
+  REJECTED
+  WINNER_ANNOUNCED
+}
+
+model CommunityChallenge {
+  id String @id @default(uuid()) @db.Uuid
+
+  title       String
+  slug        String @unique
+  excerpt     String?
+  description String
+  task        String
+
+  coverImageUrl String? @map("cover_image_url")
+
+  startAt             DateTime @map("start_at")
+  endAt               DateTime @map("end_at")
+  submissionDeadline  DateTime @map("submission_deadline")
+  votingStartAt       DateTime? @map("voting_start_at")
+  votingEndAt         DateTime? @map("voting_end_at")
+
+  status CommunityChallengeStatus @default(DRAFT)
+
+  eligibilityConfig   Json @default("{}") @map("eligibility_config")
+  participationRules  String? @map("participation_rules")
+  submissionConfig    Json @default("{}") @map("submission_config")
+
+  votingMode      ChallengeVotingMode @default(ADMIN_ONLY) @map("voting_mode")
+  winnerCount     Int @default(1) @map("winner_count")
+  prizeDescription String? @map("prize_description")
+
+  showOnHomepage        Boolean @default(true) @map("show_on_homepage")
+  showInMemberDashboard Boolean @default(true) @map("show_in_member_dashboard")
+
+  popupEnabled  Boolean @default(false) @map("popup_enabled")
+  popupStartAt  DateTime? @map("popup_start_at")
+  popupEndAt    DateTime? @map("popup_end_at")
+  popupRemindAfterDays Int @default(3) @map("popup_remind_after_days")
+
+  notificationsEnabled Boolean @default(true) @map("notifications_enabled")
+
+  forumId String? @map("forum_id") @db.Uuid
+  forum   Forum?  @relation(fields: [forumId], references: [id], onDelete: SetNull)
+  forumThreadId String? @map("forum_thread_id") @db.Uuid
+
+  createdById  String? @map("created_by_id") @db.Uuid
+  publishedById String? @map("published_by_id") @db.Uuid
+  publishedAt   DateTime? @map("published_at")
+
+  isTestData Boolean @default(false) @map("is_test_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  submissions      ChallengeSubmission[]
+  votes            ChallengeVote[]
+  userStates       ChallengeUserState[]
+  notificationLogs ChallengeNotificationLog[]
+
+  @@index([status, startAt])
+  @@index([showOnHomepage, status])
+  @@map("community_challenges")
+}
+
+model ChallengeSubmission {
+  id String @id @default(uuid()) @db.Uuid
+
+  challengeId String @map("challenge_id") @db.Uuid
+  challenge   CommunityChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId      String @map("user_id") @db.Uuid
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title           String
+  description     String
+  recipeContent   String? @map("recipe_content")
+  videoUrl        String? @map("video_url")
+
+  status ChallengeSubmissionStatus @default(DRAFT)
+
+  publicConsent       Boolean @default(false) @map("public_consent")
+  mediaRightsConsent  Boolean @default(false) @map("media_rights_consent")
+  mediaRightsConsentAt DateTime? @map("media_rights_consent_at")
+
+  submittedAt  DateTime? @map("submitted_at")
+  reviewedAt   DateTime? @map("reviewed_at")
+  reviewedById String?   @map("reviewed_by_id") @db.Uuid
+  rejectionReason String? @map("rejection_reason")
+
+  isWinner   Boolean @default(false) @map("is_winner")
+  winnerRank Int?    @map("winner_rank")
+  voteCount  Int     @default(0) @map("vote_count")
+
+  isTestData Boolean @default(false) @map("is_test_data")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  media ChallengeSubmissionMedia[]
+  votes ChallengeVote[]
+
+  @@unique([challengeId, userId])
+  @@index([challengeId, status])
+  @@index([userId])
+  @@map("challenge_submissions")
+}
+
+model ChallengeSubmissionMedia {
+  id String @id @default(uuid()) @db.Uuid
+
+  submissionId String @map("submission_id") @db.Uuid
+  submission   ChallengeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  storageUrl  String @map("storage_url")
+  storageKey  String @map("storage_key")
+  mimeType    String @map("mime_type")
+  sizeBytes   Int    @map("size_bytes")
+  mediaType   String @default("image") @map("media_type")
+  displayOrder Int   @default(0) @map("display_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([submissionId])
+  @@map("challenge_submission_media")
+}
+
+model ChallengeVote {
+  id String @id @default(uuid()) @db.Uuid
+
+  challengeId  String @map("challenge_id") @db.Uuid
+  challenge    CommunityChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  submissionId String @map("submission_id") @db.Uuid
+  submission   ChallengeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  userId       String @map("user_id") @db.Uuid
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([challengeId, userId, submissionId])
+  @@index([submissionId])
+  @@map("challenge_votes")
+}
+
+model ChallengeUserState {
+  id String @id @default(uuid()) @db.Uuid
+
+  challengeId String @map("challenge_id") @db.Uuid
+  challenge   CommunityChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId      String @map("user_id") @db.Uuid
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  popupState   ChallengePopupState? @map("popup_state")
+  lastPopupAt  DateTime? @map("last_popup_at")
+  firstSeenAt  DateTime? @map("first_seen_at")
+  dismissedAt  DateTime? @map("dismissed_at")
+  reminderAt   DateTime? @map("reminder_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([challengeId, userId])
+  @@map("challenge_user_states")
+}
+
+model ChallengeNotificationLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  challengeId      String @map("challenge_id") @db.Uuid
+  challenge        CommunityChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userId           String @map("user_id") @db.Uuid
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationType ChallengeNotificationType @map("notification_type")
+
+  sentAt DateTime @default(now()) @map("sent_at")
+
+  @@unique([challengeId, userId, notificationType])
+  @@index([userId])
+  @@map("challenge_notification_logs")
+}
+
+// =============================================================================
+// Rechtstexte & Widerruf
+// =============================================================================
+
+enum LegalDocumentType {
+  IMPRINT
+  PRIVACY_POLICY
+  TERMS_AND_CONDITIONS
+  WITHDRAWAL_POLICY
+  WITHDRAWAL_FORM
+  COOKIE_POLICY
+  OPTIONAL_OTHER
+}
+
+enum LegalDocumentStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  OUTDATED
+  ERROR
+  ARCHIVED
+}
+
+enum LegalDocumentSourceType {
+  API
+  HTML_FETCH
+  TEXT_FETCH
+  WEBHOOK
+  MANUAL_IMPORT
+  MANUAL_EDIT
+}
+
+enum LegalDocumentIntegrationMode {
+  API_SYNC
+  HTML_SYNC
+  TEXT_SYNC
+  WEBHOOK
+  MANUAL
+  IFRAME_PREVIEW_ONLY
+}
+
+enum LegalDocumentContentFormat {
+  HTML
+  MARKDOWN
+  PLAIN_TEXT
+}
+
+enum LegalDocumentVersionStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LegalSyncStatus {
+  RUNNING
+  SUCCESS
+  UNCHANGED
+  FAILED
+}
+
+enum LegalProductType {
+  DIGITAL_CONTENT
+  DIGITAL_SERVICE
+  MEMBERSHIP
+  LIVE_SERVICE
+  MIXED_CONTRACT
+  FREE_CONTENT
+}
+
+enum CheckoutConsentType {
+  TERMS
+  PRIVACY_ACKNOWLEDGEMENT
+  IMMEDIATE_ACCESS
+  WITHDRAWAL_LOSS_ACKNOWLEDGEMENT
+}
+
+enum CourseAccessMode {
+  IMMEDIATE
+  DELAYED
+}
+
+enum WithdrawalRequestStatus {
+  RECEIVED
+  UNDER_REVIEW
+  ADDITIONAL_INFORMATION_REQUIRED
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  REJECTED
+  REFUNDED
+  CLOSED
+}
+
+enum WithdrawalRequestSource {
+  PUBLIC_FORM
+  USER_ACCOUNT
+}
+
+model LegalDocument {
+  id String @id @default(uuid()) @db.Uuid
+
+  type   LegalDocumentType
+  title  String
+  slug   String @unique
+  locale String @default("de")
+
+  sourceType      LegalDocumentSourceType      @default(MANUAL_EDIT) @map("source_type")
+  providerName    String?                      @map("provider_name")
+  externalDocumentId String?                   @map("external_document_id")
+  externalUrl     String?                      @map("external_url")
+  integrationMode LegalDocumentIntegrationMode @default(MANUAL) @map("integration_mode")
+  contentFormat   LegalDocumentContentFormat   @default(HTML) @map("content_format")
+
+  currentPublishedVersionId String? @unique @map("current_published_version_id") @db.Uuid
+
+  status LegalDocumentStatus @default(DRAFT)
+
+  autoPublish        Boolean @default(false) @map("auto_publish")
+  allowManualEditing Boolean @default(true) @map("allow_manual_editing")
+  publicVisible      Boolean @default(true) @map("public_visible")
+  seoIndex           Boolean @default(true) @map("seo_index")
+
+  lastCheckedAt         DateTime? @map("last_checked_at")
+  lastSuccessfulSyncAt  DateTime? @map("last_successful_sync_at")
+  lastErrorAt           DateTime? @map("last_error_at")
+  lastErrorMessage      String?   @map("last_error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  versions               LegalDocumentVersion[] @relation("DocumentVersions")
+  currentPublishedVersion LegalDocumentVersion? @relation("PublishedVersion", fields: [currentPublishedVersionId], references: [id], onDelete: SetNull)
+  syncLogs               LegalDocumentSyncLog[]
+  credentials            LegalDocumentCredential[]
+
+  @@index([type, status])
+  @@index([publicVisible, status])
+  @@map("legal_documents")
+}
+
+model LegalDocumentVersion {
+  id String @id @default(uuid()) @db.Uuid
+
+  documentId String        @map("document_id") @db.Uuid
+  document   LegalDocument @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+
+  versionNumber  Int     @map("version_number")
+  externalVersion String? @map("external_version")
+
+  content          String @db.Text
+  sanitizedContent String @map("sanitized_content") @db.Text
+  checksum         String
+
+  status LegalDocumentVersionStatus @default(DRAFT)
+
+  validFrom  DateTime? @map("valid_from")
+  validUntil DateTime? @map("valid_until")
+
+  importedAt   DateTime  @default(now()) @map("imported_at")
+  importedById String?   @map("imported_by_id") @db.Uuid
+  importedBy   User?     @relation("LegalVersionImporter", fields: [importedById], references: [id], onDelete: SetNull)
+
+  publishedAt   DateTime? @map("published_at")
+  publishedById String?   @map("published_by_id") @db.Uuid
+  publishedBy   User?     @relation("LegalVersionPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+
+  sourceMetadata Json? @map("source_metadata")
+  changeSummary  String? @map("change_summary") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  publishedForDocument LegalDocument? @relation("PublishedVersion")
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, status])
+  @@map("legal_document_versions")
+}
+
+model LegalDocumentSyncLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  documentId String?        @map("document_id") @db.Uuid
+  document   LegalDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  status LegalSyncStatus
+
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  contentChanged   Boolean @default(false) @map("content_changed")
+  previousChecksum String? @map("previous_checksum")
+  newChecksum      String? @map("new_checksum")
+
+  errorCode    String? @map("error_code")
+  errorMessage String? @map("error_message") @db.Text
+
+  triggeredBy       String  @default("cron") @map("triggered_by")
+  triggeredByUserId String? @map("triggered_by_user_id") @db.Uuid
+
+  @@index([startedAt])
+  @@index([documentId])
+  @@map("legal_document_sync_logs")
+}
+
+model LegalDocumentCredential {
+  id String @id @default(uuid()) @db.Uuid
+
+  documentId String?        @map("document_id") @db.Uuid
+  document   LegalDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  provider        String
+  credentialType  String @map("credential_type")
+  encryptedValue  String @map("encrypted_value") @db.Text
+  expiresAt       DateTime? @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([provider, credentialType, documentId])
+  @@map("legal_document_credentials")
+}
+
+model CheckoutLegalConsent {
+  id String @id @default(uuid()) @db.Uuid
+
+  checkoutIntentId String         @map("checkout_intent_id") @db.Uuid
+  checkoutIntent   CheckoutIntent @relation(fields: [checkoutIntentId], references: [id], onDelete: Cascade)
+
+  consentType CheckoutConsentType @map("consent_type")
+  accepted    Boolean
+  labelText   String              @map("label_text") @db.Text
+
+  documentVersionId String? @map("document_version_id") @db.Uuid
+  documentChecksum  String? @map("document_checksum")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([checkoutIntentId])
+  @@map("checkout_legal_consents")
+}
+
+model PurchaseLegalRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  checkoutIntentId String         @unique @map("checkout_intent_id") @db.Uuid
+  checkoutIntent   CheckoutIntent @relation(fields: [checkoutIntentId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  accountingPositionId String? @map("accounting_position_id") @db.Uuid
+
+  termsVersionId           String? @map("terms_version_id") @db.Uuid
+  privacyVersionId         String? @map("privacy_version_id") @db.Uuid
+  withdrawalPolicyVersionId String? @map("withdrawal_policy_version_id") @db.Uuid
+
+  termsChecksum           String? @map("terms_checksum")
+  privacyChecksum         String? @map("privacy_checksum")
+  withdrawalPolicyChecksum String? @map("withdrawal_policy_checksum")
+
+  immediateAccessConsented Boolean @default(false) @map("immediate_access_consented")
+  withdrawalLossAcknowledged Boolean @default(false) @map("withdrawal_loss_acknowledged")
+  accessMode CourseAccessMode @default(DELAYED) @map("access_mode")
+  pendingAccessUntil DateTime? @map("pending_access_until")
+
+  consentSnapshot Json @default("{}") @map("consent_snapshot")
+  legalProductType LegalProductType? @map("legal_product_type")
+
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  orderLegalDocuments OrderLegalDocument[]
+
+  @@index([userId])
+  @@map("purchase_legal_records")
+}
+
+model WithdrawalRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  withdrawalNumber String @unique @map("withdrawal_number")
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation("WithdrawalUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  firstName String @map("first_name")
+  lastName  String @map("last_name")
+  email     String
+
+  orderReference String? @map("order_reference")
+  productName    String? @map("product_name")
+  orderDate      DateTime? @map("order_date")
+  contractDate   DateTime? @map("contract_date")
+  message        String? @db.Text
+
+  status WithdrawalRequestStatus @default(RECEIVED)
+
+  assignedToId String? @map("assigned_to_id") @db.Uuid
+  assignedTo   User?   @relation("WithdrawalAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  rejectionReason      String? @map("rejection_reason") @db.Text
+  legalBasisReference  String? @map("legal_basis_reference") @db.Text
+  internalNotes        String? @map("internal_notes") @db.Text
+
+  purchaseLegalRecordId String? @map("purchase_legal_record_id") @db.Uuid
+  accountingPositionId  String? @map("accounting_position_id") @db.Uuid
+  checkoutIntentId      String? @map("checkout_intent_id") @db.Uuid
+
+  source WithdrawalRequestSource @default(PUBLIC_FORM)
+  declarationText String? @map("declaration_text") @db.Text
+  courseAccessStatus String? @map("course_access_status")
+  consentSnapshot Json? @map("consent_snapshot")
+  ticketCreationFailed Boolean @default(false) @map("ticket_creation_failed")
+
+  stripeRefundId        String? @map("stripe_refund_id")
+
+  receivedAt DateTime @default(now()) @map("received_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  supportTicket SupportTicket?
+
+  @@index([status])
+  @@index([email])
+  @@index([userId])
+  @@index([accountingPositionId])
+  @@map("withdrawal_requests")
+}
+
+enum OrderLegalDocumentType {
+  TERMS_AND_CONDITIONS
+  WITHDRAWAL_POLICY
+  WITHDRAWAL_FORM
+  ORDER_CONFIRMATION
+  MEMBERSHIP_TERMS
+  PRODUCT_SPECIFIC
+}
+
+enum OrderLegalDocumentStatus {
+  PENDING
+  GENERATED
+  FAILED
+  SENT
+}
+
+model OrderLegalDocument {
+  id String @id @default(uuid()) @db.Uuid
+
+  accountingPositionId String @map("accounting_position_id") @db.Uuid
+  checkoutIntentId     String? @map("checkout_intent_id") @db.Uuid
+  purchaseLegalRecordId String? @map("purchase_legal_record_id") @db.Uuid
+  purchaseLegalRecord   PurchaseLegalRecord? @relation(fields: [purchaseLegalRecordId], references: [id], onDelete: SetNull)
+
+  legalDocumentType OrderLegalDocumentType @map("legal_document_type")
+  sourceDocumentId  String? @map("source_document_id") @db.Uuid
+  sourceVersionId   String? @map("source_version_id") @db.Uuid
+
+  title        String
+  versionLabel String? @map("version_label")
+  checksum     String
+  storageKey   String? @map("storage_key")
+  mimeType     String  @default("application/pdf") @map("mime_type")
+  sizeBytes    Int?    @map("size_bytes")
+  status       OrderLegalDocumentStatus @default(PENDING)
+  errorMessage String? @map("error_message") @db.Text
+
+  generatedAt DateTime? @map("generated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([accountingPositionId, legalDocumentType])
+  @@index([checkoutIntentId])
+  @@map("order_legal_documents")
+}
+
+enum PrivacyRequestType {
+  ACCESS
+  RECTIFICATION
+  DELETION
+  RESTRICTION
+  OBJECTION
+  PORTABILITY
+  EXPORT
+}
+
+enum PrivacyRequestStatus {
+  REQUESTED
+  EMAIL_CONFIRMATION_PENDING
+  CONFIRMED
+  IDENTITY_REVIEW
+  UNDER_REVIEW
+  PARTIALLY_FULFILLED
+  FULFILLED
+  REJECTED
+  CANCELLED
+}
+
+enum AccountDeletionPlanStatus {
+  DRAFT
+  CONFIRMED
+  BLOCKED
+  SCHEDULED
+  EXECUTING
+  PARTIALLY_COMPLETED
+  COMPLETED
+  FAILED
+}
+
+enum DataExportRequestStatus {
+  REQUESTED
+  PROCESSING
+  READY
+  DOWNLOADED
+  EXPIRED
+  FAILED
+}
+
+model UserAccountMessage {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  messageType String @map("message_type")
+  title       String
+  body        String @db.Text
+  linkUrl     String? @map("link_url")
+  readAt      DateTime? @map("read_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, readAt])
+  @@map("user_account_messages")
+}
+
+model PrivacyRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  requestNumber String @unique @map("request_number")
+  type          PrivacyRequestType
+  status        PrivacyRequestStatus @default(REQUESTED)
+
+  userMessage   String? @map("user_message") @db.Text
+  responseText  String? @map("response_text") @db.Text
+  rejectionReason String? @map("rejection_reason") @db.Text
+  internalNotes String? @map("internal_notes") @db.Text
+
+  emailConfirmationTokenHash String? @map("email_confirmation_token_hash")
+  emailConfirmationExpiresAt DateTime? @map("email_confirmation_expires_at")
+  emailConfirmedAt DateTime? @map("email_confirmed_at")
+  finalConfirmedAt DateTime? @map("final_confirmed_at")
+
+  assignedToId String? @map("assigned_to_id") @db.Uuid
+  assignedTo   User?   @relation("PrivacyAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  dueAt       DateTime? @map("due_at")
+  completedAt DateTime? @map("completed_at")
+
+  supportTicket SupportTicket?
+
+  requestedAt DateTime @default(now()) @map("requested_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  deletionPlan AccountDeletionPlan?
+  dataExport     DataExportRequest?
+
+  @@index([userId, status])
+  @@index([status, dueAt])
+  @@map("privacy_requests")
+}
+
+model AccountDeletionPlan {
+  id String @id @default(uuid()) @db.Uuid
+
+  privacyRequestId String @unique @map("privacy_request_id") @db.Uuid
+  privacyRequest   PrivacyRequest @relation(fields: [privacyRequestId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status AccountDeletionPlanStatus @default(DRAFT)
+
+  deletableData      Json @default("[]") @map("deletable_data")
+  anonymizableData   Json @default("[]") @map("anonymizable_data")
+  retainedData       Json @default("[]") @map("retained_data")
+  blockingItems      Json @default("[]") @map("blocking_items")
+  retentionSchedule  Json @default("[]") @map("retention_schedule")
+
+  calculatedAt DateTime? @map("calculated_at")
+  executedAt   DateTime? @map("executed_at")
+
+  /// Löschung ausführen ab (z. B. nach Mitgliedschafts-Ablauf)
+  scheduledExecutionAt DateTime? @map("scheduled_execution_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@index([scheduledExecutionAt])
+  @@map("account_deletion_plans")
+}
+
+model AccountDataRetention {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dataCategory   String @map("data_category")
+  reasonCode     String @map("reason_code")
+  legalReference String? @map("legal_reference")
+  retentionUntil DateTime? @map("retention_until")
+  restrictedAt   DateTime? @map("restricted_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, dataCategory])
+  @@index([retentionUntil])
+  @@map("account_data_retentions")
+}
+
+model DataExportRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  privacyRequestId String? @unique @map("privacy_request_id") @db.Uuid
+  privacyRequest   PrivacyRequest? @relation(fields: [privacyRequestId], references: [id], onDelete: SetNull)
+
+  status DataExportRequestStatus @default(REQUESTED)
+  storageKey String? @map("storage_key")
+  expiresAt  DateTime? @map("expires_at")
+  requestedAt DateTime @default(now()) @map("requested_at")
+  generatedAt DateTime? @map("generated_at")
+  downloadedAt DateTime? @map("downloaded_at")
+  errorMessage String? @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@map("data_export_requests")
+}
+
+// =============================================================================
+// Zentrales E-Mail-System
+// =============================================================================
+
+enum EmailProviderType {
+  DEV
+  DISABLED
+  SMTP
+  RESEND
+  BREVO
+  POSTMARK
+  SES
+  MAILGUN
+  SENDGRID
+}
+
+enum EmailCategory {
+  AUTH
+  ACCOUNT
+  SUPPORT
+  TICKET
+  COURSE
+  CERTIFICATE
+  ORDER
+  PAYMENT
+  BILLING
+  MEMBERSHIP
+  WITHDRAWAL
+  PRIVACY
+  CHALLENGE
+  COMMUNITY
+  MASTER_SUPPORT
+  NEWSLETTER
+  SECURITY
+  SYSTEM
+  ADMIN_MANUAL
+}
+
+enum EmailTemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum EmailMessageStatus {
+  PENDING
+  PROCESSING
+  SENT
+  DELIVERED
+  FAILED
+  RETRYING
+  BOUNCED
+  COMPLAINED
+  CANCELLED
+  SUPPRESSED
+}
+
+enum EmailPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+  BULK
+}
+
+enum EmailSuppressionReason {
+  HARD_BOUNCE
+  SOFT_BOUNCE_LIMIT
+  COMPLAINT
+  MANUAL_BLOCK
+  INVALID_ADDRESS
+  PROVIDER_SUPPRESSION
+}
+
+enum EmailDeliveryEventType {
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  REJECTED
+  DEFERRED
+  OPENED
+  CLICKED
+}
+
+model EmailProviderConfig {
+  id String @id @default(uuid()) @db.Uuid
+
+  providerType EmailProviderType @map("provider_type")
+  name         String
+  active       Boolean @default(false)
+
+  encryptedCredentials String? @map("encrypted_credentials") @db.Text
+  settings             Json    @default("{}")
+
+  lastTestedAt   DateTime? @map("last_tested_at")
+  lastTestStatus String?   @map("last_test_status")
+  lastError      String?   @map("last_error") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  senders  EmailSenderIdentity[]
+  messages EmailMessage[]
+
+  @@index([active, providerType])
+  @@map("email_provider_configs")
+}
+
+model EmailSenderIdentity {
+  id String @id @default(uuid()) @db.Uuid
+
+  providerConfigId String @map("provider_config_id") @db.Uuid
+  providerConfig   EmailProviderConfig @relation(fields: [providerConfigId], references: [id], onDelete: Restrict)
+
+  internalName   String @map("internal_name")
+  displayName    String @map("display_name")
+  emailAddress   String @map("email_address")
+  replyToAddress String? @map("reply_to_address")
+
+  active        Boolean @default(true)
+  verified      Boolean @default(false)
+  defaultSender Boolean @default(false) @map("default_sender")
+  allowedCategories EmailCategory[] @default([]) @map("allowed_categories")
+  sortOrder     Int @default(0) @map("sort_order")
+
+  dkimStatus  String? @map("dkim_status")
+  spfStatus   String? @map("spf_status")
+  dmarcStatus String? @map("dmarc_status")
+
+  lastTestedAt        DateTime? @map("last_tested_at")
+  lastSuccessfulSendAt DateTime? @map("last_successful_send_at")
+  lastError           String?   @map("last_error") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  messages EmailMessage[]
+
+  @@unique([emailAddress])
+  @@index([active, verified])
+  @@map("email_sender_identities")
+}
+
+model EmailTemplate {
+  id String @id @default(uuid()) @db.Uuid
+
+  key      String @unique
+  name     String
+  category EmailCategory
+  locale   String @default("de")
+  status   EmailTemplateStatus @default(DRAFT)
+
+  activeVersionId String? @unique @map("active_version_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  versions EmailTemplateVersion[] @relation("TemplateVersions")
+  activeVersion EmailTemplateVersion? @relation("ActiveTemplateVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+
+  @@index([category, status])
+  @@map("email_templates")
+}
+
+model EmailTemplateVersion {
+  id String @id @default(uuid()) @db.Uuid
+
+  templateId String @map("template_id") @db.Uuid
+  template   EmailTemplate @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+
+  version          Int
+  subject          String
+  preheader        String? @map("preheader")
+  htmlContent      String  @map("html_content") @db.Text
+  textContent      String  @map("text_content") @db.Text
+  allowedVariables Json    @default("[]") @map("allowed_variables")
+  status           EmailTemplateStatus @default(DRAFT)
+
+  createdById   String? @map("created_by_id") @db.Uuid
+  createdBy     User?   @relation("EmailTemplateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  publishedById String? @map("published_by_id") @db.Uuid
+  publishedBy   User?   @relation("EmailTemplatePublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt   DateTime? @map("published_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  activeForTemplate EmailTemplate? @relation("ActiveTemplateVersion")
+  messages          EmailMessage[]
+
+  @@unique([templateId, version])
+  @@index([templateId, status])
+  @@map("email_template_versions")
+}
+
+model EmailMessage {
+  id String @id @default(uuid()) @db.Uuid
+
+  recipientUserId String? @map("recipient_user_id") @db.Uuid
+  recipientEmail  String  @map("recipient_email")
+  recipientMasked String  @map("recipient_masked")
+
+  senderIdentityId String? @map("sender_identity_id") @db.Uuid
+  senderIdentity   EmailSenderIdentity? @relation(fields: [senderIdentityId], references: [id], onDelete: SetNull)
+  providerConfigId String? @map("provider_config_id") @db.Uuid
+  providerConfig   EmailProviderConfig? @relation(fields: [providerConfigId], references: [id], onDelete: SetNull)
+  templateVersionId String? @map("template_version_id") @db.Uuid
+  templateVersion   EmailTemplateVersion? @relation(fields: [templateVersionId], references: [id], onDelete: SetNull)
+
+  category EmailCategory
+  subjectSnapshot String @map("subject_snapshot")
+  htmlSnapshot    String? @map("html_snapshot") @db.Text
+  textSnapshot    String? @map("text_snapshot") @db.Text
+
+  status   EmailMessageStatus @default(PENDING)
+  priority EmailPriority      @default(NORMAL)
+
+  scheduledAt DateTime? @map("scheduled_at")
+  sentAt      DateTime? @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  failedAt    DateTime? @map("failed_at")
+
+  attempts         Int     @default(0)
+  nextRetryAt      DateTime? @map("next_retry_at")
+  lastErrorCode    String?   @map("last_error_code")
+  lastErrorMessage String?   @map("last_error_message") @db.Text
+  providerMessageId String?  @map("provider_message_id")
+
+  relatedEntityType String? @map("related_entity_type")
+  relatedEntityId   String? @map("related_entity_id")
+  requestedByUserId String? @map("requested_by_user_id") @db.Uuid
+  requestedBy       User?   @relation("EmailRequestedBy", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  isTest      Boolean @default(false) @map("is_test")
+  hasAttachments Boolean @default(false) @map("has_attachments")
+  createAccountMessage Boolean @default(false) @map("create_account_message")
+  accountMessageType   String? @map("account_message_type")
+  accountMessageTitle  String? @map("account_message_title")
+  accountMessageBody   String? @map("account_message_body") @db.Text
+  accountMessageLink   String? @map("account_message_link")
+
+  processingLockAt DateTime? @map("processing_lock_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  attachments EmailAttachment[]
+  events      EmailDeliveryEvent[]
+
+  @@index([status, priority, nextRetryAt])
+  @@index([recipientUserId, createdAt])
+  @@index([category, status])
+  @@index([relatedEntityType, relatedEntityId])
+  @@map("email_messages")
+}
+
+model EmailAttachment {
+  id String @id @default(uuid()) @db.Uuid
+
+  emailMessageId String @map("email_message_id") @db.Uuid
+  emailMessage   EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+
+  filename  String
+  mimeType  String @map("mime_type")
+  sizeBytes Int    @map("size_bytes")
+  storageKey String @map("storage_key")
+  checksum  String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([emailMessageId])
+  @@map("email_attachments")
+}
+
+model EmailDeliveryEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  emailMessageId String @map("email_message_id") @db.Uuid
+  emailMessage   EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+
+  providerEventId String? @map("provider_event_id")
+  eventType       EmailDeliveryEventType @map("event_type")
+  occurredAt      DateTime @map("occurred_at")
+  metadata        Json     @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([emailMessageId, eventType])
+  @@map("email_delivery_events")
+}
+
+model EmailSuppression {
+  id String @id @default(uuid()) @db.Uuid
+
+  emailHash String @unique @map("email_hash")
+  reason    EmailSuppressionReason
+  source    String
+  active    Boolean @default(true)
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  releasedAt DateTime? @map("released_at")
+
+  @@index([active])
+  @@map("email_suppressions")
+}
+
+model EmailPreference {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId   String @map("user_id") @db.Uuid
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category EmailCategory
+  enabled  Boolean @default(true)
+  source   String  @default("user")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, category])
+  @@index([category, enabled])
+  @@map("email_preferences")
+}
+
+model EmailCategoryConfig {
+  id String @id @default(uuid()) @db.Uuid
+
+  category EmailCategory @unique
+  defaultSenderId String? @map("default_sender_id") @db.Uuid
+  defaultReplyTo  String? @map("default_reply_to")
+  defaultPriority EmailPriority @default(NORMAL) @map("default_priority")
+  transactional   Boolean @default(true)
+  marketing       Boolean @default(false)
+  attachmentsAllowed Boolean @default(false) @map("attachments_allowed")
+  alsoAccountMessage Boolean @default(false) @map("also_account_message")
+  manualSendRoles  Json @default("[]") @map("manual_send_roles")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("email_category_configs")
+}
+
+// =============================================================================
+// Social Sharing (nutzergenerierte Inhalte)
+// =============================================================================
+
+enum ShareContentType {
+  CERTIFICATE
+  DIPLOMA
+  RECIPE
+}
+
+enum ShareStatus {
+  ACTIVE
+  DISABLED
+  REVOKED
+  ADMIN_BLOCKED
+}
+
+/// Öffentliche Freigabe für Zertifikate, Urkunden und eigene Rezepte
+model PublicShare {
+  id String @id @default(uuid()) @db.Uuid
+
+  shareToken String @unique @map("share_token")
+
+  contentType ShareContentType @map("content_type")
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  owner       User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  certificateId String? @unique @map("certificate_id") @db.Uuid
+  certificate   UserCourseCertificate? @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+
+  recipeId String? @map("recipe_id") @db.Uuid
+  recipe   Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  title String
+
+  isPublic         Boolean @default(true) @map("is_public")
+  linkOnly         Boolean @default(false) @map("link_only")
+  showIngredients  Boolean @default(false) @map("show_ingredients")
+  showInstructions Boolean @default(false) @map("show_instructions")
+
+  status ShareStatus @default(ACTIVE)
+
+  viewCount       Int @default(0) @map("view_count")
+  whatsappShares  Int @default(0) @map("whatsapp_shares")
+  facebookShares  Int @default(0) @map("facebook_shares")
+  linkedinShares  Int @default(0) @map("linkedin_shares")
+  twitterShares   Int @default(0) @map("twitter_shares")
+  emailShares     Int @default(0) @map("email_shares")
+  linkCopies      Int @default(0) @map("link_copies")
+
+  consentAt DateTime? @map("consent_at")
+  revokedAt DateTime? @map("revoked_at")
+  adminNote String?   @map("admin_note") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([recipeId, ownerUserId])
+  @@index([ownerUserId, status])
+  @@index([contentType, status])
+  @@index([shareToken])
+  @@map("public_shares")
+}
+
+/// Sicherheitsprotokoll für abgewiesene oder manipulierte Freigabeversuche
+model ShareSecurityLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId   String? @map("user_id") @db.Uuid
+  recipeId String? @map("recipe_id") @db.Uuid
+  shareId  String? @map("share_id") @db.Uuid
+  ipAddress String? @map("ip_address")
+  action   String
+  details  Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([recipeId])
+  @@index([createdAt])
+  @@map("share_security_logs")
+}
+
+// =============================================================================
+// Berechtigungssystem — Gruppen, Katalog, granulare Rechte
+// =============================================================================
+
+enum PermissionEffect {
+  ALLOW
+  DENY
+}
+
+enum UserGroupStatus {
+  active
+  deactivated
+  archived
+}
+
+enum PermissionAuditAction {
+  group_created
+  group_updated
+  group_deleted
+  group_duplicated
+  group_archived
+  group_deactivated
+  group_member_added
+  group_member_removed
+  group_permission_allowed
+  group_permission_denied
+  group_permission_removed
+  user_permission_allowed
+  user_permission_denied
+  user_permission_removed
+  admin_right_granted
+  admin_right_revoked
+  superadmin_change_attempt
+  unauthorized_access
+  membership_group_sync
+}
+
+/// Zentraler Berechtigungskatalog (technische Schlüssel, nicht frei editierbar)
+model Permission {
+  id String @id @default(uuid()) @db.Uuid
+
+  key         String  @unique
+  name        String
+  description String  @db.Text
+  category    String
+  areaKey     String? @map("area_key")
+  actionKey   String? @map("action_key")
+  isCritical  Boolean @default(false) @map("is_critical")
+  superAdminOnly Boolean @default(false) @map("super_admin_only")
+  isSystem    Boolean @default(true) @map("is_system")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  groupPermissions UserGroupPermission[]
+  userPermissions  UserPermission[]
+  routePermissions RoutePermission[]
+  featurePermissions FeaturePermission[]
+
+  @@index([category])
+  @@index([areaKey])
+  @@map("permissions")
+}
+
+/// Administrierbare Benutzergruppe
+model UserGroup {
+  id String @id @default(uuid()) @db.Uuid
+
+  name         String
+  slug         String  @unique
+  description  String? @db.Text
+  internalNote String? @map("internal_note") @db.Text
+  color        String? @default("#C9A227")
+  priority     Int     @default(100)
+  isSystem     Boolean @default(false) @map("is_system")
+  status       UserGroupStatus @default(active)
+
+  /// Automatische Zuordnung bei dieser Mitgliedschaftsrolle (null = manuelle Gruppe)
+  linkedMembershipRole MembershipRole? @unique @map("linked_membership_role")
+  /// Automatische Zuordnung bei dieser Systemrolle (null = keine)
+  linkedSystemRole     UserSystemRole? @unique @map("linked_system_role")
+
+  archivedAt DateTime? @map("archived_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  permissions UserGroupPermission[]
+  members     UserGroupMember[]
+
+  @@index([status])
+  @@index([priority])
+  @@map("user_groups")
+}
+
+/// Berechtigung einer Gruppe (ALLOW oder DENY)
+model UserGroupPermission {
+  id String @id @default(uuid()) @db.Uuid
+
+  groupId      String @map("group_id") @db.Uuid
+  group        UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  permissionId String @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  effect       PermissionEffect @default(ALLOW)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([groupId, permissionId])
+  @@index([permissionId])
+  @@map("user_group_permissions")
+}
+
+/// Benutzer-Zuordnung zu einer Gruppe (optional zeitlich begrenzt)
+model UserGroupMember {
+  id String @id @default(uuid()) @db.Uuid
+
+  groupId String @map("group_id") @db.Uuid
+  group   UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId  String @map("user_id") @db.Uuid
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  validFrom  DateTime? @map("valid_from")
+  validUntil DateTime? @map("valid_until")
+  isManual   Boolean   @default(true) @map("is_manual")
+
+  assignedByUserId String? @map("assigned_by_user_id") @db.Uuid
+  assignedBy       User?   @relation("UserGroupAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([validUntil])
+  @@map("user_group_members")
+}
+
+/// Individuelle Benutzerberechtigung (Erlaubnis oder Verbot)
+model UserPermission {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId       String @map("user_id") @db.Uuid
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  effect       PermissionEffect
+
+  validFrom  DateTime? @map("valid_from")
+  validUntil DateTime? @map("valid_until")
+
+  assignedByUserId String? @map("assigned_by_user_id") @db.Uuid
+  assignedBy       User?   @relation("UserPermissionAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, permissionId])
+  @@index([permissionId])
+  @@index([validUntil])
+  @@map("user_permissions")
+}
+
+/// Route → Berechtigung (serverseitige URL-Prüfung)
+model RoutePermission {
+  id String @id @default(uuid()) @db.Uuid
+
+  routeKey     String @unique @map("route_key")
+  routePattern String @map("route_pattern")
+  permissionId String @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([permissionId])
+  @@map("route_permissions")
+}
+
+/// Feature-Schlüssel → Berechtigung
+model FeaturePermission {
+  id String @id @default(uuid()) @db.Uuid
+
+  featureKey   String @unique @map("feature_key")
+  permissionId String @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([permissionId])
+  @@map("feature_permissions")
+}
+
+/// Audit-Protokoll für Gruppen- und Berechtigungsänderungen
+model PermissionAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  action PermissionAuditAction
+
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  actor       User?   @relation("PermissionAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  targetUserId String? @map("target_user_id") @db.Uuid
+  targetUser   User?   @relation("PermissionAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  targetGroupId String? @map("target_group_id") @db.Uuid
+  targetGroupName String? @map("target_group_name")
+
+  permissionKey String? @map("permission_key")
+  previousValues Json? @map("previous_values")
+  newValues      Json? @map("new_values")
+  summary        String
+  note           String? @db.Text
+  ipAddress      String? @map("ip_address")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@index([targetGroupId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("permission_audit_logs")
+}
+
+// ─── Werkstatt: Produktempfehlungen & Partnerlinks ───────────────────────────
+
+enum ProductRecommendationStatus {
+  draft
+  published
+  archived
+}
+
+enum PartnerProgramType {
+  amazon
+  awin
+  digistore24
+  own_shop
+  external
+  course
+}
+
+enum ProductRecommendationClickType {
+  view
+  amazon
+  shop
+  affiliate
+}
+
+/// Partnerprogramm (zentral administrierbar, z. B. Amazon PartnerNet)
+model PartnerProgram {
+  id String @id @default(uuid()) @db.Uuid
+
+  name        String
+  slug        String @unique
+  programType PartnerProgramType @map("program_type")
+  affiliateId String? @map("affiliate_id")
+  /// URL-Vorlage mit Platzhaltern: {asin}, {url}, {tag}
+  urlTemplate String? @map("url_template") @db.Text
+  baseUrl     String? @map("base_url")
+  isActive    Boolean @default(true) @map("is_active")
+  sortOrder   Int     @default(100) @map("sort_order")
+  note        String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  products ProductRecommendation[]
+
+  @@index([isActive])
+  @@map("partner_programs")
+}
+
+/// Globale Einstellungen für Produktempfehlungen (Singleton)
+model ProductRecommendationSettings {
+  id String @id @default("default")
+
+  affiliateDisclosureText String @default("Dieser Link kann ein Partnerlink sein. Für Sie entstehen keine zusätzlichen Kosten.") @map("affiliate_disclosure_text") @db.Text
+  defaultAmazonProgramId String? @map("default_amazon_program_id") @db.Uuid
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("product_recommendation_settings")
+}
+
+/// Produktkategorie (Wurstfüller, Thermometer, …)
+model ProductRecommendationCategory {
+  id String @id @default(uuid()) @db.Uuid
+
+  name        String
+  slug        String @unique
+  description String? @db.Text
+  sortOrder   Int     @default(100) @map("sort_order")
+  isActive    Boolean @default(true) @map("is_active")
+  /// Standardbild wenn Produkt kein eigenes Bild hat
+  placeholderImageStorageKey String? @map("placeholder_image_storage_key")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  products ProductRecommendation[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("product_recommendation_categories")
+}
+
+/// Kuratierte Produktempfehlung in der Werkstatt
+model ProductRecommendation {
+  id String @id @default(uuid()) @db.Uuid
+
+  title            String
+  slug             String @unique
+  shortDescription String @map("short_description") @db.VarChar(250)
+  longDescription  String? @map("long_description") @db.Text
+  manufacturer     String?
+  subcategory      String?
+
+  categoryId String @map("category_id") @db.Uuid
+  category   ProductRecommendationCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  mainImageStorageKey String? @map("main_image_storage_key")
+  sortOrder           Int     @default(100) @map("sort_order")
+  priority            Int     @default(0)
+  status              ProductRecommendationStatus @default(draft)
+
+  /// Generischer Affiliate-Link (falls kein Partnerprogramm)
+  affiliateLink String? @map("affiliate_link")
+  /// Amazon ASIN oder vollständige URL
+  amazonLink    String? @map("amazon_link")
+  shopLink      String? @map("shop_link")
+
+  partnerProgramId String? @map("partner_program_id") @db.Uuid
+  partnerProgram   PartnerProgram? @relation(fields: [partnerProgramId], references: [id], onDelete: SetNull)
+
+  /// Empfehlung von Fleischermeister Ralf Hermanski
+  isMasterRecommendation Boolean @default(false) @map("is_master_recommendation")
+  masterRecommendationText String? @map("master_recommendation_text") @db.Text
+
+  seoTitle       String? @map("seo_title")
+  seoDescription String? @map("seo_description") @db.VarChar(320)
+  ogTitle        String? @map("og_title")
+  ogDescription  String? @map("og_description") @db.VarChar(320)
+  ogImageStorageKey String? @map("og_image_storage_key")
+
+  viewCount          Int @default(0) @map("view_count")
+  amazonClickCount   Int @default(0) @map("amazon_click_count")
+  shopClickCount     Int @default(0) @map("shop_click_count")
+  affiliateClickCount Int @default(0) @map("affiliate_click_count")
+
+  publishedAt DateTime? @map("published_at")
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  galleryImages ProductRecommendationGalleryImage[]
+  courseLinks   ProductRecommendationCourseLink[]
+  recipeLinks   ProductRecommendationRecipeLink[]
+  clickEvents   ProductRecommendationClickEvent[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([sortOrder])
+  @@index([priority])
+  @@map("product_recommendations")
+}
+
+/// Galeriebild eines Produkts
+model ProductRecommendationGalleryImage {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId String @map("product_id") @db.Uuid
+  product   ProductRecommendation @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  storageKey String @map("storage_key")
+  sortOrder  Int    @default(100) @map("sort_order")
+  caption    String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("product_recommendation_gallery_images")
+}
+
+/// Verknüpfung Produktempfehlung ↔ Kurs
+model ProductRecommendationCourseLink {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId String @map("product_id") @db.Uuid
+  product   ProductRecommendation @relation(fields: [productId], references: [id], onDelete: Cascade)
+  courseId  String @map("course_id") @db.Uuid
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sortOrder Int    @default(100) @map("sort_order")
+
+  @@unique([productId, courseId])
+  @@index([courseId])
+  @@map("product_recommendation_course_links")
+}
+
+/// Verknüpfung Produktempfehlung ↔ Rezept
+model ProductRecommendationRecipeLink {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId String @map("product_id") @db.Uuid
+  product   ProductRecommendation @relation(fields: [productId], references: [id], onDelete: Cascade)
+  recipeId  String @map("recipe_id") @db.Uuid
+  recipe    Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  sortOrder Int    @default(100) @map("sort_order")
+
+  @@unique([productId, recipeId])
+  @@index([recipeId])
+  @@map("product_recommendation_recipe_links")
+}
+
+/// Klick-/Aufruf-Ereignis für Statistik
+model ProductRecommendationClickEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId String @map("product_id") @db.Uuid
+  product   ProductRecommendation @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  eventType ProductRecommendationClickType @map("event_type")
+  userId    String? @map("user_id") @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("product_recommendation_click_events")
+}
+
+// =============================================================================
+// Enterprise Security — Ereignisse, Sperren, Audit, 2FA, Sitzungen
+// =============================================================================
+
+enum SecurityEventType {
+  LOGIN_FAILED
+  ADMIN_LOGIN_FAILED
+  TOTP_FAILED
+  TOTP_SUCCESS
+  PASSWORD_RESET_REQUEST
+  PASSWORD_RESET_ABUSE
+  REGISTRATION_ATTEMPT
+  REGISTRATION_SPAM
+  API_ABUSE
+  MASS_REQUEST
+  BOT_ACTIVITY
+  SUSPICIOUS_URL
+  FORM_MANIPULATION
+  RATE_LIMIT_EXCEEDED
+  IP_BLOCKED
+  IP_UNBLOCKED
+  SESSION_REVOKED
+  UPLOAD_REJECTED
+  CAPTCHA_REQUIRED
+  SECURITY_WARNING
+}
+
+enum SecurityRiskLevel {
+  low
+  medium
+  high
+  critical
+}
+
+enum IpBlockLevel {
+  throttle
+  captcha
+  temporary_30m
+  extended_24h
+  permanent
+}
+
+enum SecurityAuditAction {
+  ROLE_CHANGE
+  USER_UPDATE
+  USER_SUSPEND
+  USER_UNSUSPEND
+  MEMBERSHIP_CHANGE
+  COURSE_ACCESS_GRANT
+  COURSE_ACCESS_REVOKE
+  CERTIFICATE_ISSUE
+  CERTIFICATE_REVOKE
+  PAYMENT_PROCESSED
+  IP_BLOCK
+  IP_UNBLOCK
+  SETTINGS_CHANGE
+  TOTP_ENABLED
+  TOTP_DISABLED
+  SESSION_REVOKED
+  SECURITY_RULE_CHANGE
+  PERMISSION_CHANGE
+  OTHER
+}
+
+enum SecurityAuditResult {
+  success
+  failure
+  denied
+}
+
+/// Sicherheitsereignis (Angriffserkennung, Fehlversuche, Missbrauch)
+model SecurityEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  eventType SecurityEventType @map("event_type")
+  riskLevel SecurityRiskLevel @default(low) @map("risk_level")
+
+  ipAddress   String? @map("ip_address")
+  userAgent   String? @map("user_agent") @db.Text
+  browser     String?
+  os          String?
+  countryCode String? @map("country_code")
+  region      String?
+  asn         String?
+  provider    String?
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  path        String?
+  method      String?
+  description String? @db.Text
+  metadata    Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([eventType])
+  @@index([riskLevel])
+  @@index([ipAddress])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([countryCode])
+  @@map("security_events")
+}
+
+/// IP-Sperre (stufenweise: throttle → captcha → 30m → 24h → permanent)
+model BlockedIp {
+  id String @id @default(uuid()) @db.Uuid
+
+  ipAddress String @map("ip_address")
+  level     IpBlockLevel @default(temporary_30m)
+  reason    String? @db.Text
+  notes     String? @db.Text
+
+  blockedAt DateTime  @default(now()) @map("blocked_at")
+  expiresAt DateTime? @map("expires_at")
+
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+  createdByUser   User?   @relation("BlockedIpCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  isActive  Boolean  @default(true) @map("is_active")
+  revokedAt DateTime? @map("revoked_at")
+
+  @@index([ipAddress])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@map("blocked_ips")
+}
+
+/// Unveränderliches Administrator-Sicherheitsprotokoll
+model SecurityAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  action     SecurityAuditAction
+  result     SecurityAuditResult @default(success)
+  entityType String? @map("entity_type")
+  entityId   String? @map("entity_id") @db.Uuid
+
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  actorUser   User?   @relation("SecurityAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  targetUserId String? @map("target_user_id") @db.Uuid
+  targetUser   User?   @relation("SecurityAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  ipAddress   String? @map("ip_address")
+  description String? @db.Text
+  metadata    Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([action])
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@map("security_audit_logs")
+}
+
+/// Registrierte Nutzersitzung (Geräteverwaltung, Widerruf)
+model UserSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String @map("token_hash")
+
+  deviceLabel String? @map("device_label")
+  browser     String?
+  os          String?
+  countryCode String? @map("country_code")
+  region      String?
+  ipAddress   String? @map("ip_address")
+
+  lastActiveAt DateTime @default(now()) @map("last_active_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  revokedAt    DateTime? @map("revoked_at")
+
+  isNewDevice Boolean @default(false) @map("is_new_device")
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([revokedAt])
+  @@map("user_sessions")
+}
+
+/// TOTP-Zwei-Faktor-Authentifizierung (Google Authenticator kompatibel)
+model UserTotp {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Verschlüsselter/gehashter Secret (nur serverseitig)
+  secretEncrypted String @map("secret_encrypted")
+
+  isEnabled   Boolean  @default(false) @map("is_enabled")
+  enabledAt   DateTime? @map("enabled_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("user_totp")
+}
+
+/// Einmal-Backup-Codes für 2FA-Wiederherstellung
+model TotpBackupCode {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  codeHash String @map("code_hash")
+  usedAt   DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([codeHash])
+  @@map("totp_backup_codes")
+}
+
+/// Verdächtiger Nutzer (Flag für Admin-Review)
+model SuspiciousUserFlag {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reason    String @db.Text
+  riskLevel SecurityRiskLevel @default(medium) @map("risk_level")
+  isActive  Boolean @default(true) @map("is_active")
+  notes     String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("suspicious_user_flags")
+}
+
+/// Globale Sicherheitseinstellungen (Singleton)
+model SecuritySettings {
+  id String @id @default("default") @db.VarChar(32)
+
+  /// Stufe 1: Fehlversuche bis Verlangsamung
+  loginFailThresholdThrottle Int @default(5) @map("login_fail_threshold_throttle")
+  /// Stufe 1b: Fehlversuche bis Captcha
+  loginFailThresholdCaptcha Int @default(8) @map("login_fail_threshold_captcha")
+  /// Stufe 2: Fehlversuche bis 30-Min-Sperre
+  loginFailThreshold30m Int @default(10) @map("login_fail_threshold_30m")
+  /// Stufe 3: Fehlversuche bis 24h-Sperre
+  loginFailThreshold24h Int @default(15) @map("login_fail_threshold_24h")
+
+  /// Rate-Limits (pro Minute)
+  loginRateLimitPerIp      Int @default(20) @map("login_rate_limit_per_ip")
+  registerRateLimitPerIp   Int @default(5) @map("register_rate_limit_per_ip")
+  passwordResetRateLimitPerIp Int @default(5) @map("password_reset_rate_limit_per_ip")
+  apiRateLimitPerIp        Int @default(120) @map("api_rate_limit_per_ip")
+
+  /// DSGVO-Aufbewahrungsfristen (Tage)
+  retentionLoginAttemptsDays Int @default(90) @map("retention_login_attempts_days")
+  retentionSecurityEventsDays Int @default(365) @map("retention_security_events_days")
+  retentionBlockedIpsDays    Int @default(180) @map("retention_blocked_ips_days")
+  retentionAuditLogDays      Int @default(730) @map("retention_audit_log_days")
+
+  /// 2FA-Pflicht für Rollen (JSON-Array von UserSystemRole)
+  totpRequiredRoles Json @default("[\"ADMIN\",\"SUPERADMIN\",\"SUPPORT\",\"INSTRUCTOR\"]") @map("totp_required_roles")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("security_settings")
+}
