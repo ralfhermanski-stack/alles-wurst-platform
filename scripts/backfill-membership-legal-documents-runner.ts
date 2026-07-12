@@ -14,7 +14,7 @@ async function main(): Promise<void> {
     where: {
       productType: "membership",
       paymentStatus: "paid",
-      checkoutIntentId: { not: null },
+      checkoutIntent: { isNot: null },
     },
     include: {
       checkoutIntent: {
