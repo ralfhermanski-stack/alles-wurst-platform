@@ -89,6 +89,48 @@ async function ensureForumRulesDocumentPublished(): Promise<void> {
     return;
   }
 
+  const publishedVersion = await prisma.legalDocumentVersion.findFirst({
+    where: {
+      documentId: document.id,
+      status: "PUBLISHED",
+    },
+    orderBy: { versionNumber: "desc" },
+  });
+
+  if (publishedVersion) {
+    await prisma.legalDocument.update({
+      where: { id: document.id },
+      data: {
+        status: "PUBLISHED",
+        currentPublishedVersion: { connect: { id: publishedVersion.id } },
+      },
+    });
+    return;
+  }
+
+  const pendingVersion = await prisma.legalDocumentVersion.findFirst({
+    where: { documentId: document.id },
+    orderBy: { versionNumber: "desc" },
+  });
+
+  if (pendingVersion) {
+    await prisma.legalDocumentVersion.update({
+      where: { id: pendingVersion.id },
+      data: {
+        status: "PUBLISHED",
+        publishedAt: new Date(),
+      },
+    });
+    await prisma.legalDocument.update({
+      where: { id: document.id },
+      data: {
+        status: "PUBLISHED",
+        currentPublishedVersion: { connect: { id: pendingVersion.id } },
+      },
+    });
+    return;
+  }
+
   await importLegalDocumentVersion({
     documentId: document.id,
     content: FORUM_RULES_DEFAULT_HTML,

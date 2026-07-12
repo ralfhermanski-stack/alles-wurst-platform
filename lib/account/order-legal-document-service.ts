@@ -35,6 +35,11 @@ const DOC_TYPE_MAP: Array<{
     orderType: "WITHDRAWAL_FORM",
     title: "Muster-Widerrufsformular",
   },
+  {
+    legalType: "PRIVACY_POLICY",
+    orderType: "PRODUCT_SPECIFIC",
+    title: "Datenschutzerklärung",
+  },
 ];
 
 async function renderLegalPdf(input: {
@@ -237,7 +242,9 @@ export async function generateOrderLegalDocuments(input: {
           ? record.termsChecksum ?? published.checksum ?? ""
           : mapping.legalType === "WITHDRAWAL_POLICY"
             ? record.withdrawalPolicyChecksum ?? published.checksum ?? ""
-            : published.checksum ?? computeLegalChecksum(published.contentHtml);
+            : mapping.legalType === "PRIVACY_POLICY"
+              ? record.privacyChecksum ?? published.checksum ?? ""
+              : published.checksum ?? computeLegalChecksum(published.contentHtml);
 
       const pdfBuffer = await renderLegalPdf({
         title: mapping.title,

@@ -6,6 +6,7 @@
 import type {
   AccountingProductType,
   BillingPeriod,
+  CourseAccessMode,
   MembershipRole,
   ProductKind,
 } from "@prisma/client";
@@ -180,6 +181,18 @@ export async function fulfillSuccessfulPayment(input: {
 
       await syncMembershipGroupForUser(input.userId);
 
+      await finalizePurchaseLegalDocuments({
+        checkoutIntentId: checkout.id,
+        userId: input.userId,
+        accountingPositionId: input.accountingPositionId,
+        productKind: product.kind,
+        legalConfig: product.legalConfig,
+        accessMode: "IMMEDIATE",
+        pendingAccessUntil: null,
+        immediateAccessConsented: false,
+        withdrawalLossAcknowledged: false,
+      });
+
       return userSuccess({
         kind: "membership",
         membershipRole:
@@ -225,19 +238,11 @@ export async function fulfillSuccessfulPayment(input: {
         withdrawalLossAcknowledged,
       });
 
-      const { generateOrderLegalDocuments } = await import(
-        "@/lib/account/order-legal-document-service"
-      );
-
-      if (input.accountingPositionId) {
-        void generateOrderLegalDocuments({
-          checkoutIntentId: checkout.id,
-          userId: input.userId,
-          accountingPositionId: input.accountingPositionId,
-        }).catch((error) => {
-          console.error("[orders] Vertrags-PDFs konnten nicht erzeugt werden.", error);
-        });
-      }
+      await generateOrderLegalDocumentsForCheckout({
+        checkoutIntentId: checkout.id,
+        userId: input.userId,
+        accountingPositionId: input.accountingPositionId,
+      });
 
       const accessDecision = await resolveCourseAccessFromLegalRecord({
         checkoutIntentId: checkout.id,
@@ -311,4 +316,48 @@ export function resolveAccountingProductType(
   kind: ProductKind,
 ): AccountingProductType {
   return productKindToAccountingType(kind);
+}
+
+async function generateOrderLegalDocumentsForCheckout(input: {
+  checkoutIntentId: string;
+  userId: string;
+  accountingPositionId: string | null;
+}): Promise<void> {
+  if (!input.accountingPositionId) {
+    return;
+  }
+
+  const { generateOrderLegalDocuments } = await import(
+    "@/lib/account/order-legal-document-service"
+  );
+
+  await generateOrderLegalDocuments({
+    checkoutIntentId: input.checkoutIntentId,
+    userId: input.userId,
+    accountingPositionId: input.accountingPositionId,
+  }).catch((error) => {
+    console.error("[orders] Vertrags-PDFs konnten nicht erzeugt werden.", error);
+  });
+}
+
+async function finalizePurchaseLegalDocuments(input: {
+  checkoutIntentId: string;
+  userId: string;
+  accountingPositionId: string | null;
+  productKind: ProductKind;
+  legalConfig: unknown;
+  accessMode: CourseAccessMode;
+  pendingAccessUntil: Date | null;
+  immediateAccessConsented: boolean;
+  withdrawalLossAcknowledged: boolean;
+}): Promise<void> {
+  const existing = await prisma.purchaseLegalRecord.findUnique({
+    where: { checkoutIntentId: input.checkoutIntentId },
+  });
+
+  if (!existing) {
+    await createPurchaseLegalRecord(input);
+  }
+
+  await generateOrderLegalDocumentsForCheckout(input);
 }

@@ -33,7 +33,7 @@ export default function MemberForumPage({
   const [newBody, setNewBody] = useState("");
   const [creating, setCreating] = useState(false);
   const canWriteForum = forum?.canWrite ?? false;
-  const rules = useForumRulesAcceptance(canWriteForum);
+  const rules = useForumRulesAcceptance(Boolean(slug));
 
   async function loadForumData(forumSlug: string) {
     const [forumResponse, threadsResponse] = await Promise.all([
@@ -134,7 +134,7 @@ export default function MemberForumPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      {rules.status && (
+      {rules.status && forum.canWrite && (
         <ForumRulesAcceptanceModal
           open={rules.needsAcceptance}
           status={rules.status}
@@ -175,7 +175,10 @@ export default function MemberForumPage({
             {rules.needsAcceptance ? (
               <p className="mt-4 text-sm text-aw-muted">
                 Bitte akzeptiere zuerst die Forenregeln im Dialog, um ein Thema
-                zu erstellen.
+                zu erstellen.{" "}
+                <Link href="/forenregeln" className="text-aw-gold underline">
+                  Regeln lesen
+                </Link>
               </p>
             ) : (
               <div className="mt-4 space-y-3">

@@ -140,6 +140,10 @@ export async function getUserOrderDetail(
 
   const legalRecord = position.checkoutIntent?.purchaseLegalRecord ?? null;
   const courseAccess = position.checkoutIntent?.courseAccess[0] ?? null;
+  const membership =
+    position.productType === "membership"
+      ? await prisma.membership.findUnique({ where: { userId } })
+      : null;
 
   const openWithdrawal = await prisma.withdrawalRequest.findFirst({
     where: {
@@ -186,10 +190,20 @@ export async function getUserOrderDetail(
     paidAt: position.paidAt?.toISOString() ?? null,
     createdAt: position.createdAt.toISOString(),
     hasWithdrawal: Boolean(openWithdrawal),
-    accessStatus: courseAccess?.status ?? null,
+    accessStatus:
+      courseAccess?.status ??
+      (membership?.status && position.productType === "membership"
+        ? membership.status
+        : null),
     checkoutIntentId: position.checkoutIntent?.id ?? null,
-    accessMode: legalRecord?.accessMode ?? null,
-    pendingAccessUntil: legalRecord?.pendingAccessUntil?.toISOString() ?? null,
+    accessMode:
+      legalRecord?.accessMode ??
+      (membership?.status === "active" ? "IMMEDIATE" : null),
+    pendingAccessUntil:
+      legalRecord?.pendingAccessUntil?.toISOString() ??
+      (membership?.endsAt && position.productType === "membership"
+        ? membership.endsAt.toISOString()
+        : null),
     legalProductType: legalRecord?.legalProductType ?? null,
     immediateAccessConsented: legalRecord?.immediateAccessConsented ?? false,
     withdrawalLossAcknowledged: legalRecord?.withdrawalLossAcknowledged ?? false,

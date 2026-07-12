@@ -22,7 +22,7 @@ export default function MemberForumThreadPage({
   const [threadSlug, setThreadSlug] = useState<string | null>(null);
   const [thread, setThread] = useState<ForumThreadDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const rules = useForumRulesAcceptance(thread?.canWrite ?? false);
+  const rules = useForumRulesAcceptance(Boolean(slug && thread));
 
   async function loadThread(forumSlug: string, topicSlug: string) {
     const response = await fetch(
@@ -112,7 +112,7 @@ export default function MemberForumThreadPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      {rules.status && (
+      {rules.status && thread.canWrite && (
         <ForumRulesAcceptanceModal
           open={rules.needsAcceptance}
           status={rules.status}
@@ -175,7 +175,10 @@ export default function MemberForumThreadPage({
           </h2>
           {rules.needsAcceptance ? (
             <p className="text-sm text-aw-muted">
-              Bitte akzeptiere zuerst die Forenregeln im Dialog, um zu antworten.
+              Bitte akzeptiere zuerst die Forenregeln im Dialog, um zu antworten.{" "}
+              <Link href="/forenregeln" className="text-aw-gold underline">
+                Regeln lesen
+              </Link>
             </p>
           ) : (
             <ForumComposer

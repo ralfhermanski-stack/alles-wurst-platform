@@ -64,7 +64,13 @@ export default async function MeinBereichBestellungDetailPage({ params }: PagePr
           <p className="text-aw-cream">
             {order.accessMode === "DELAYED" && order.pendingAccessUntil
               ? `Verzögert bis ${new Date(order.pendingAccessUntil).toLocaleDateString("de-DE")}`
-              : order.accessMode ?? "—"}
+              : order.accessMode === "IMMEDIATE"
+                ? order.productType === "membership" && order.pendingAccessUntil
+                  ? `Aktiv bis ${new Date(order.pendingAccessUntil).toLocaleDateString("de-DE")}`
+                  : "Sofort aktiv"
+                : order.pendingAccessUntil && order.productType === "membership"
+                  ? `Aktiv bis ${new Date(order.pendingAccessUntil).toLocaleDateString("de-DE")}`
+                  : (order.accessMode ?? "—")}
           </p>
         </div>
       </div>
