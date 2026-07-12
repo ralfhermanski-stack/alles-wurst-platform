@@ -5,6 +5,12 @@
 import type { CourseAccessMode, LegalProductType } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { buildContractConfirmationView } from "@/lib/legal/contract-confirmation-service";
+import type { ContractConfirmationView } from "@/lib/legal/contract-confirmation-service";
+import {
+  immediateAccessStatusLabel,
+  withdrawalLossStatusLabel,
+} from "@/lib/legal/legal-consent-texts";
 import {
   userFailure,
   userSuccess,
@@ -34,11 +40,14 @@ export type UserOrderDetail = UserOrderSummary & {
   legalProductType: LegalProductType | null;
   immediateAccessConsented: boolean;
   withdrawalLossAcknowledged: boolean;
+  immediateAccessStatus: string;
+  withdrawalLossStatus: string;
   withdrawalEligible: boolean;
   withdrawalExpiredNotice: boolean;
   openWithdrawalId: string | null;
   openWithdrawalNumber: string | null;
   withdrawalToken: string | null;
+  contract: ContractConfirmationView | null;
   legalDocuments: Array<{
     id: string;
     title: string;
@@ -126,6 +135,15 @@ export async function getUserOrderDetail(
         include: {
           purchaseLegalRecord: true,
           courseAccess: { take: 1 },
+          productPrice: {
+            include: { product: true },
+          },
+        },
+      },
+      user: {
+        select: {
+          email: true,
+          profile: true,
         },
       },
     },
@@ -166,13 +184,54 @@ export async function getUserOrderDetail(
   const notCancelled = position.paymentStatus !== "cancelled";
   const noOpenWithdrawal = !openWithdrawal;
 
+  const immediateAccessConsented =
+    legalRecord?.immediateAccessConsented ?? false;
+  const withdrawalLossAcknowledged =
+    legalRecord?.withdrawalLossAcknowledged ?? false;
+  const bothConsentsGiven =
+    immediateAccessConsented && withdrawalLossAcknowledged;
+
   const withdrawalEligible =
-    paid && notRefunded && notCancelled && noOpenWithdrawal;
+    paid &&
+    notRefunded &&
+    notCancelled &&
+    noOpenWithdrawal &&
+    !bothConsentsGiven;
 
   const orderNumber = formatOrderNumber({
     invoiceNumber: position.invoice?.invoiceNumber,
     positionId: position.id,
   });
+
+  const checkout = position.checkoutIntent;
+  const product = checkout?.productPrice.product;
+  const billingPeriod = checkout?.productPrice.billingPeriod ?? "one_time";
+
+  const contract =
+    checkout && product
+      ? buildContractConfirmationView({
+          orderNumber,
+          productName: product.name,
+          productSlug: product.slug,
+          productKind: product.kind,
+          productDescription: product.description,
+          billingPeriod,
+          grossAmount: position.grossAmount.toNumber(),
+          currency: position.currency,
+          paymentProvider: checkout.paymentProvider,
+          paymentStatus: position.paymentStatus,
+          paidAt: position.paidAt,
+          createdAt: position.createdAt,
+          invoiceNumber: position.invoice?.invoiceNumber ?? null,
+          immediateAccessConsented,
+          withdrawalLossAcknowledged,
+          membershipEndsAt: membership?.endsAt ?? null,
+          recordedAt: legalRecord?.recordedAt ?? position.createdAt,
+          consentSnapshot: legalRecord?.consentSnapshot ?? null,
+          customerProfile: position.user.profile,
+          customerEmail: position.user.email,
+        })
+      : null;
 
   const paidAt = position.paidAt ?? position.createdAt;
   const daysSincePurchase = Math.floor(
@@ -205,8 +264,10 @@ export async function getUserOrderDetail(
         ? membership.endsAt.toISOString()
         : null),
     legalProductType: legalRecord?.legalProductType ?? null,
-    immediateAccessConsented: legalRecord?.immediateAccessConsented ?? false,
-    withdrawalLossAcknowledged: legalRecord?.withdrawalLossAcknowledged ?? false,
+    immediateAccessConsented,
+    withdrawalLossAcknowledged,
+    immediateAccessStatus: immediateAccessStatusLabel(immediateAccessConsented),
+    withdrawalLossStatus: withdrawalLossStatusLabel(withdrawalLossAcknowledged),
     withdrawalEligible,
     withdrawalExpiredNotice: daysSincePurchase > 14,
     openWithdrawalId: openWithdrawal?.id ?? null,
@@ -214,6 +275,7 @@ export async function getUserOrderDetail(
     withdrawalToken: withdrawalEligible
       ? createOrderAccessToken(userId, position.id)
       : null,
+    contract,
     legalDocuments: legalDocuments.map((document) => ({
       id: document.id,
       title: document.title,

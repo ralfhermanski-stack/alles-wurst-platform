@@ -3531,11 +3531,21 @@ model PurchaseLegalRecord {
   consentSnapshot Json @default("{}") @map("consent_snapshot")
   legalProductType LegalProductType? @map("legal_product_type")
 
+  /// Revisionssicherer Nachweis zum Zustimmungszeitpunkt
+  clientIpHash       String? @map("client_ip_hash")
+  userAgentHash      String? @map("user_agent_hash")
+  orderNumber        String? @map("order_number")
+  productName        String? @map("product_name")
+  productSlug        String? @map("product_slug")
+  membershipRole     String? @map("membership_role")
+  consentTextVersion String? @map("consent_text_version")
+
   recordedAt DateTime @default(now()) @map("recorded_at")
 
   orderLegalDocuments OrderLegalDocument[]
 
   @@index([userId])
+  @@index([orderNumber])
   @@map("purchase_legal_records")
 }
 

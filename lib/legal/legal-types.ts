@@ -16,6 +16,8 @@ export type LegalDocumentPublicView = {
   slug: string;
   title: string;
   contentHtml: string;
+  documentId: string | null;
+  versionId: string | null;
   versionNumber: number | null;
   checksum: string | null;
   providerName: string | null;
@@ -146,12 +148,16 @@ export function resolveProductLegalConfig(
   config: unknown,
 ): Required<ProductLegalConfig> {
   const parsed = parseProductLegalConfig(config);
-  const isDigitalContent = kind === "course" || kind === "workshop";
+  const isDigitalOrMembership =
+    kind === "course" ||
+    kind === "workshop" ||
+    kind === "membership_wurstclub" ||
+    kind === "membership_meisterclub";
 
   return {
-    allowImmediateAccess: parsed.allowImmediateAccess ?? isDigitalContent,
+    allowImmediateAccess: parsed.allowImmediateAccess ?? isDigitalOrMembership,
     requireImmediateAccessConsent:
-      parsed.requireImmediateAccessConsent ?? isDigitalContent,
+      parsed.requireImmediateAccessConsent ?? isDigitalOrMembership,
     allowPurchaseWithoutImmediateConsent:
       parsed.allowPurchaseWithoutImmediateConsent ?? true,
     withdrawalPeriodDays: parsed.withdrawalPeriodDays ?? 14,

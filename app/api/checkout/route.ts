@@ -1,4 +1,5 @@
 import { getSessionUserIdFromRequest } from "@/lib/auth/session";
+import { collectPurchaseEvidence } from "@/lib/legal/purchase-evidence";
 import { prisma } from "@/lib/db/prisma";
 import { createCheckoutIntent } from "@/lib/payments/checkout-intent-service";
 import {
@@ -31,6 +32,31 @@ function parsePaymentProvider(value: string | null): PaymentProvider | null {
 function parseBooleanField(body: Record<string, unknown>, key: string): boolean {
   const value = body[key];
   return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function parseNullableBooleanField(
+  body: Record<string, unknown>,
+  key: string,
+): boolean | null | undefined {
+  if (!(key in body)) {
+    return undefined;
+  }
+
+  const value = body[key];
+
+  if (value === null || value === "null") {
+    return null;
+  }
+
+  if (value === true || value === "true" || value === 1 || value === "1") {
+    return true;
+  }
+
+  if (value === false || value === "false" || value === 0 || value === "0") {
+    return false;
+  }
+
+  return null;
 }
 
 /**
@@ -89,15 +115,16 @@ export async function POST(request: Request): Promise<Response> {
     userId,
     productPriceId,
     paymentProvider,
+    evidence: collectPurchaseEvidence({ request }),
     legalConsents: body
       ? {
           termsAccepted: parseBooleanField(body, "termsAccepted"),
           privacyAcknowledged: parseBooleanField(body, "privacyAcknowledged"),
-          immediateAccessConsent: parseBooleanField(
+          immediateAccessConsent: parseNullableBooleanField(
             body,
             "immediateAccessConsent",
           ),
-          withdrawalLossAcknowledged: parseBooleanField(
+          withdrawalLossAcknowledged: parseNullableBooleanField(
             body,
             "withdrawalLossAcknowledged",
           ),

@@ -6,14 +6,12 @@
 import type {
   AccountingProductType,
   BillingPeriod,
-  CourseAccessMode,
   MembershipRole,
   ProductKind,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import {
-  createPurchaseLegalRecord,
   resolveCourseAccessFromLegalRecord,
 } from "@/lib/legal/legal-checkout-service";
 import {
@@ -119,6 +117,22 @@ export async function fulfillSuccessfulPayment(input: {
       const endsAt = calculateMembershipEnd(checkout.productPrice.billingPeriod);
       const now = new Date();
 
+      const legalRecord = await prisma.purchaseLegalRecord.findUnique({
+        where: { checkoutIntentId: checkout.id },
+      });
+
+      const metadata = checkout.providerMetadata as Record<string, unknown> | null;
+      const accessMode =
+        legalRecord?.accessMode ??
+        (metadata?.accessMode === "DELAYED" ? "DELAYED" : "IMMEDIATE");
+      const pendingAccessUntil =
+        legalRecord?.pendingAccessUntil ??
+        (typeof metadata?.pendingAccessUntil === "string"
+          ? new Date(metadata.pendingAccessUntil)
+          : null);
+      const immediateAccess =
+        accessMode === "IMMEDIATE" && !pendingAccessUntil;
+
       await prisma.membership.upsert({
         where: { userId: input.userId },
         create: {
@@ -126,8 +140,10 @@ export async function fulfillSuccessfulPayment(input: {
           role: membershipRole,
           status: "active",
           paymentStatus: "paid",
-          accessBlocked: false,
-          blockReason: null,
+          accessBlocked: !immediateAccess,
+          blockReason: immediateAccess
+            ? null
+            : `Sofortige Bereitstellung nicht zugestimmt — Freischaltung ab ${pendingAccessUntil?.toLocaleDateString("de-DE") ?? "Widerrufsfrist"}.`,
           startedAt: now,
           endsAt,
           extendedUntil: endsAt,
@@ -140,14 +156,18 @@ export async function fulfillSuccessfulPayment(input: {
           cancelRequestedAt: null,
           renewalRemindersSuppressed: false,
           lastRenewalReminderForPeriodEnd: null,
-          paymentNote: `${PRODUCT_KIND_LABELS[product.kind]} aktiviert.`,
+          paymentNote: immediateAccess
+            ? `${PRODUCT_KIND_LABELS[product.kind]} aktiviert.`
+            : `${PRODUCT_KIND_LABELS[product.kind]} bezahlt — Freischaltung nach Widerrufsfrist.`,
         },
         update: {
           role: membershipRole,
           status: "active",
           paymentStatus: "paid",
-          accessBlocked: false,
-          blockReason: null,
+          accessBlocked: !immediateAccess,
+          blockReason: immediateAccess
+            ? null
+            : `Sofortige Bereitstellung nicht zugestimmt — Freischaltung ab ${pendingAccessUntil?.toLocaleDateString("de-DE") ?? "Widerrufsfrist"}.`,
           startedAt: now,
           endsAt,
           extendedUntil: endsAt,
@@ -160,20 +180,24 @@ export async function fulfillSuccessfulPayment(input: {
           cancelRequestedAt: null,
           renewalRemindersSuppressed: false,
           lastRenewalReminderForPeriodEnd: null,
-          paymentNote: `${PRODUCT_KIND_LABELS[product.kind]} aktiviert.`,
+          paymentNote: immediateAccess
+            ? `${PRODUCT_KIND_LABELS[product.kind]} aktiviert.`
+            : `${PRODUCT_KIND_LABELS[product.kind]} bezahlt — Freischaltung nach Widerrufsfrist.`,
         },
       });
 
-      const { grantMembershipBonusCourses } = await import(
-        "@/lib/courses/course-access-service"
-      );
+      if (immediateAccess) {
+        const { grantMembershipBonusCourses } = await import(
+          "@/lib/courses/course-access-service"
+        );
 
-      await grantMembershipBonusCourses({
-        userId: input.userId,
-        membershipRole,
-        billingPeriod: checkout.productPrice.billingPeriod,
-        membershipEndsAt: endsAt,
-      });
+        await grantMembershipBonusCourses({
+          userId: input.userId,
+          membershipRole,
+          billingPeriod: checkout.productPrice.billingPeriod,
+          membershipEndsAt: endsAt,
+        });
+      }
 
       const { syncMembershipGroupForUser } = await import(
         "@/lib/permissions/permission-seed"
@@ -181,16 +205,10 @@ export async function fulfillSuccessfulPayment(input: {
 
       await syncMembershipGroupForUser(input.userId);
 
-      await finalizePurchaseLegalDocuments({
+      await generateOrderLegalDocumentsForCheckout({
         checkoutIntentId: checkout.id,
         userId: input.userId,
         accountingPositionId: input.accountingPositionId,
-        productKind: product.kind,
-        legalConfig: product.legalConfig,
-        accessMode: "IMMEDIATE",
-        pendingAccessUntil: null,
-        immediateAccessConsented: false,
-        withdrawalLossAcknowledged: false,
       });
 
       return userSuccess({
@@ -203,40 +221,6 @@ export async function fulfillSuccessfulPayment(input: {
     if (product.kind === "course" || product.kind === "workshop") {
       const expiresAt = calculateAccessEnd(checkout.productPrice.billingPeriod);
       const now = new Date();
-
-      const consents = await prisma.checkoutLegalConsent.findMany({
-        where: { checkoutIntentId: checkout.id },
-      });
-
-      const immediateAccessConsented = consents.some(
-        (consent) =>
-          consent.consentType === "IMMEDIATE_ACCESS" && consent.accepted,
-      );
-      const withdrawalLossAcknowledged = consents.some(
-        (consent) =>
-          consent.consentType === "WITHDRAWAL_LOSS_ACKNOWLEDGEMENT" &&
-          consent.accepted,
-      );
-
-      const metadata = checkout.providerMetadata as Record<string, unknown> | null;
-      const accessMode =
-        metadata?.accessMode === "DELAYED" ? "DELAYED" : "IMMEDIATE";
-      const pendingAccessUntil =
-        typeof metadata?.pendingAccessUntil === "string"
-          ? new Date(metadata.pendingAccessUntil)
-          : null;
-
-      await createPurchaseLegalRecord({
-        checkoutIntentId: checkout.id,
-        userId: input.userId,
-        accountingPositionId: input.accountingPositionId,
-        productKind: product.kind,
-        legalConfig: product.legalConfig,
-        accessMode,
-        pendingAccessUntil,
-        immediateAccessConsented,
-        withdrawalLossAcknowledged,
-      });
 
       await generateOrderLegalDocumentsForCheckout({
         checkoutIntentId: checkout.id,
@@ -338,26 +322,4 @@ async function generateOrderLegalDocumentsForCheckout(input: {
   }).catch((error) => {
     console.error("[orders] Vertrags-PDFs konnten nicht erzeugt werden.", error);
   });
-}
-
-async function finalizePurchaseLegalDocuments(input: {
-  checkoutIntentId: string;
-  userId: string;
-  accountingPositionId: string | null;
-  productKind: ProductKind;
-  legalConfig: unknown;
-  accessMode: CourseAccessMode;
-  pendingAccessUntil: Date | null;
-  immediateAccessConsented: boolean;
-  withdrawalLossAcknowledged: boolean;
-}): Promise<void> {
-  const existing = await prisma.purchaseLegalRecord.findUnique({
-    where: { checkoutIntentId: input.checkoutIntentId },
-  });
-
-  if (!existing) {
-    await createPurchaseLegalRecord(input);
-  }
-
-  await generateOrderLegalDocumentsForCheckout(input);
 }

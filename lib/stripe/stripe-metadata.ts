@@ -25,6 +25,11 @@ export type StripeCheckoutMetadata = {
   product_id: string;
   product_price_id: string;
   payment_intent_id: string;
+  access_mode?: string;
+  immediate_access?: string;
+  withdrawal_loss_ack?: string;
+  consent_version?: string;
+  terms_checksum?: string;
 };
 
 export function resolveStripeProductType(kind: ProductKind): StripeProductType {
@@ -64,6 +69,26 @@ export function buildStripeMetadata(
     product_price_id: input.product_price_id,
     payment_intent_id: input.payment_intent_id,
   };
+
+  if (input.access_mode) {
+    metadata.access_mode = input.access_mode;
+  }
+
+  if (input.immediate_access) {
+    metadata.immediate_access = input.immediate_access;
+  }
+
+  if (input.withdrawal_loss_ack) {
+    metadata.withdrawal_loss_ack = input.withdrawal_loss_ack;
+  }
+
+  if (input.consent_version) {
+    metadata.consent_version = input.consent_version;
+  }
+
+  if (input.terms_checksum) {
+    metadata.terms_checksum = input.terms_checksum.slice(0, 64);
+  }
 
   return Object.fromEntries(
     Object.entries(metadata).filter(([, value]) => value.length > 0),

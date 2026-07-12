@@ -5,8 +5,11 @@
 import PDFDocument from "pdfkit";
 
 import { prisma } from "@/lib/db/prisma";
+import { buildContractConfirmationView } from "@/lib/legal/contract-confirmation-service";
+import { renderContractConfirmationPdf } from "@/lib/legal/contract-pdf-renderer";
 import { computeLegalChecksum } from "@/lib/legal/legal-checksum";
 import { getPublishedLegalDocumentByType } from "@/lib/legal/legal-document-service";
+import { getInvoiceSellerConfig } from "@/lib/invoices/invoice-config";
 import { formatOrderNumber } from "./account-order-service";
 import {
   readOrderLegalPdf,
@@ -65,7 +68,11 @@ async function renderLegalPdf(input: {
       .replace(/&nbsp;/g, " ")
       .trim();
 
-    doc.fontSize(18).text("Alles Wurst", { align: "left" });
+    const seller = getInvoiceSellerConfig();
+    doc.fontSize(18).text("ALLES WURST", { align: "left" });
+    doc.moveDown(0.3);
+    doc.fontSize(9).fillColor("#444444");
+    doc.text(`${seller.street}, ${seller.postalCode} ${seller.city}`);
     doc.moveDown(0.5);
     doc.fontSize(14).text(input.title, { underline: true });
     doc.moveDown();
@@ -81,44 +88,9 @@ async function renderLegalPdf(input: {
 }
 
 async function renderOrderConfirmationPdf(input: {
-  orderNumber: string;
-  productName: string;
-  grossAmount: string;
-  currency: string;
-  recordedAt: Date;
-  immediateAccessConsented: boolean;
-  withdrawalLossAcknowledged: boolean;
-  accessMode: string;
+  contract: Awaited<ReturnType<typeof buildContractConfirmationView>>;
 }): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margins: { top: 48, bottom: 48, left: 48, right: 48 } });
-    const chunks: Buffer[] = [];
-
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-
-    doc.fontSize(18).text("Vertragsbestätigung");
-    doc.moveDown();
-    doc.fontSize(10);
-    doc.text(`Bestellnummer: ${input.orderNumber}`);
-    doc.text(`Produkt: ${input.productName}`);
-    doc.text(`Preis: ${input.grossAmount} ${input.currency}`);
-    doc.text(`Datum: ${input.recordedAt.toLocaleString("de-DE")}`);
-    doc.text(`Freischaltungsart: ${input.accessMode}`);
-    doc.moveDown();
-    doc.text(
-      input.immediateAccessConsented
-        ? "Sofortige Bereitstellung: zugestimmt"
-        : "Sofortige Bereitstellung: nicht zugestimmt",
-    );
-    doc.text(
-      input.withdrawalLossAcknowledged
-        ? "Kenntnis Widerrufsverlust: bestätigt"
-        : "Kenntnis Widerrufsverlust: nicht bestätigt",
-    );
-    doc.end();
-  });
+  return renderContractConfirmationPdf(input.contract);
 }
 
 async function upsertOrderLegalDocument(input: {
@@ -182,6 +154,13 @@ export async function generateOrderLegalDocuments(input: {
     include: {
       productPrice: { include: { product: true } },
       purchaseLegalRecord: true,
+      user: {
+        select: {
+          email: true,
+          profile: true,
+          membership: { select: { endsAt: true } },
+        },
+      },
     },
   });
 
@@ -296,16 +275,30 @@ export async function generateOrderLegalDocuments(input: {
   }
 
   try {
-    const confirmationPdf = await renderOrderConfirmationPdf({
+    const contract = buildContractConfirmationView({
       orderNumber,
       productName: checkout.productPrice.product.name,
-      grossAmount: checkout.grossAmount.toString(),
+      productSlug: checkout.productPrice.product.slug,
+      productKind: checkout.productPrice.product.kind,
+      productDescription: checkout.productPrice.product.description,
+      billingPeriod: checkout.productPrice.billingPeriod,
+      grossAmount: checkout.grossAmount.toNumber(),
       currency: checkout.currency,
-      recordedAt,
+      paymentProvider: checkout.paymentProvider,
+      paymentStatus: position.paymentStatus,
+      paidAt: position.paidAt,
+      createdAt: position.createdAt,
+      invoiceNumber: position.invoice?.invoiceNumber ?? null,
       immediateAccessConsented: record.immediateAccessConsented,
       withdrawalLossAcknowledged: record.withdrawalLossAcknowledged,
-      accessMode: record.accessMode,
+      membershipEndsAt: checkout.user.membership?.endsAt ?? null,
+      recordedAt: record.recordedAt,
+      consentSnapshot: record.consentSnapshot,
+      customerProfile: checkout.user.profile,
+      customerEmail: checkout.user.email,
     });
+
+    const confirmationPdf = await renderOrderConfirmationPdf({ contract });
 
     await upsertOrderLegalDocument({
       accountingPositionId: position.id,

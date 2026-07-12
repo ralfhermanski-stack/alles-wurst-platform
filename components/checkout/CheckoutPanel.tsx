@@ -53,8 +53,8 @@ export default function CheckoutPanel({
   const [legalConsents, setLegalConsents] = useState<CheckoutLegalConsentState>({
     termsAccepted: false,
     privacyAcknowledged: false,
-    immediateAccessConsent: false,
-    withdrawalLossAcknowledged: false,
+    immediateAccessConsent: null,
+    withdrawalLossAcknowledged: null,
   });
 
   const selectedPrice = product.prices.find((price) => price.id === priceId);

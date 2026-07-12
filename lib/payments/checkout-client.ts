@@ -79,8 +79,8 @@ export async function createCheckoutApi(input: {
   paymentProvider: PaymentProvider;
   termsAccepted?: boolean;
   privacyAcknowledged?: boolean;
-  immediateAccessConsent?: boolean;
-  withdrawalLossAcknowledged?: boolean;
+  immediateAccessConsent?: boolean | null;
+  withdrawalLossAcknowledged?: boolean | null;
 }): Promise<
   CheckoutApiResponse<{ checkoutId: string; redirectUrl?: string }>
 > {

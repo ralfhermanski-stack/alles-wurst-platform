@@ -17,6 +17,8 @@ import type {
   ProductPrice,
 } from "@prisma/client";
 
+import type { PurchaseEvidence } from "@/lib/legal/purchase-evidence";
+
 export type ProductEntry = {
   id: string;
   kind: ProductKind;
@@ -83,11 +85,12 @@ export type CreateCheckoutIntentInput = {
   paymentProvider: PaymentProvider;
   dueDate?: string | null;
   note?: string | null;
+  evidence?: PurchaseEvidence;
   legalConsents?: {
     termsAccepted: boolean;
     privacyAcknowledged: boolean;
-    immediateAccessConsent?: boolean;
-    withdrawalLossAcknowledged?: boolean;
+    immediateAccessConsent?: boolean | null;
+    withdrawalLossAcknowledged?: boolean | null;
   };
 };
 

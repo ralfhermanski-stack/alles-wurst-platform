@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { activateDueDelayedCourseAccess } from "@/lib/legal/legal-checkout-service";
+import { activateDueDelayedAccess } from "@/lib/legal/legal-checkout-service";
 import { authorizeLegalCron } from "@/lib/legal/legal-cron-auth";
 import { syncAllLegalDocuments } from "@/lib/legal/legal-document-sync-service";
 
@@ -16,7 +16,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const syncResult = await syncAllLegalDocuments("cron");
-    const activatedAccess = await activateDueDelayedCourseAccess();
+    const activatedAccess = await activateDueDelayedAccess();
 
     return NextResponse.json({
       success: true,

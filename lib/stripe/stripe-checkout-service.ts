@@ -128,6 +128,7 @@ export async function createStripeCheckoutSession(input: {
           },
         },
       },
+      purchaseLegalRecord: true,
       user: {
         include: {
           profile: true,
@@ -194,6 +195,15 @@ export async function createStripeCheckoutSession(input: {
     product_id: product.id,
     product_price_id: checkout.productPriceId,
     payment_intent_id: input.paymentIntentId,
+    access_mode: checkout.purchaseLegalRecord?.accessMode ?? undefined,
+    immediate_access: checkout.purchaseLegalRecord?.immediateAccessConsented
+      ? "true"
+      : "false",
+    withdrawal_loss_ack: checkout.purchaseLegalRecord?.withdrawalLossAcknowledged
+      ? "true"
+      : "false",
+    consent_version: checkout.purchaseLegalRecord?.consentTextVersion ?? undefined,
+    terms_checksum: checkout.purchaseLegalRecord?.termsChecksum ?? undefined,
   });
 
   const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = isSubscription

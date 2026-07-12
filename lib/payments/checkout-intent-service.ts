@@ -22,6 +22,7 @@ import {
   isPaymentSucceeded,
 } from "./payment-status-mapper";
 import {
+  createPurchaseLegalRecord,
   storeCheckoutLegalConsents,
   validateCheckoutLegalRequirements,
 } from "@/lib/legal/legal-checkout-service";
@@ -90,8 +91,8 @@ export async function createCheckoutIntent(
   const legalConsents = input.legalConsents ?? {
     termsAccepted: false,
     privacyAcknowledged: false,
-    immediateAccessConsent: false,
-    withdrawalLossAcknowledged: false,
+    immediateAccessConsent: null,
+    withdrawalLossAcknowledged: null,
   };
 
   const legalValidation = await validateCheckoutLegalRequirements({
@@ -154,6 +155,23 @@ export async function createCheckoutIntent(
     await storeCheckoutLegalConsents({
       checkoutIntentId: checkout.id,
       consents: legalConsents,
+    });
+
+    await createPurchaseLegalRecord({
+      checkoutIntentId: checkout.id,
+      userId: input.userId,
+      accountingPositionId: checkout.accountingPositionId,
+      productKind: product.kind,
+      productName: product.name,
+      productSlug: product.slug,
+      billingPeriod: price.billingPeriod,
+      legalConfig: product.legalConfig,
+      accessMode: legalValidation.data.accessMode,
+      pendingAccessUntil: legalValidation.data.pendingAccessUntil,
+      immediateAccessConsented: legalValidation.data.immediateAccessConsented,
+      withdrawalLossAcknowledged:
+        legalValidation.data.withdrawalLossAcknowledged,
+      evidence: input.evidence,
     });
 
     const paymentResult = await createPaymentIntentForCheckout({

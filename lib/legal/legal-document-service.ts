@@ -157,6 +157,7 @@ function resolveDocumentEmbedUrl(
 
 function mapPublishedLegalDocument(
   document: {
+    id: string;
     type: LegalDocumentType;
     slug: string;
     title: string;
@@ -168,6 +169,7 @@ function mapPublishedLegalDocument(
     lastSuccessfulSyncAt: Date | null;
     status: string;
     currentPublishedVersion: {
+      id: string;
       sanitizedContent: string;
       versionNumber: number;
       checksum: string;
@@ -189,6 +191,8 @@ function mapPublishedLegalDocument(
       slug: document.slug,
       title: document.title,
       contentHtml: "",
+      documentId: document.id,
+      versionId: version?.id ?? null,
       versionNumber: version?.versionNumber ?? null,
       checksum: version?.checksum ?? null,
       providerName: document.providerName,
@@ -209,6 +213,8 @@ function mapPublishedLegalDocument(
       slug: document.slug,
       title: document.title,
       contentHtml: getUnavailableLegalMessage(document.title),
+      documentId: document.id,
+      versionId: null,
       versionNumber: null,
       checksum: null,
       providerName: document.providerName,
@@ -228,6 +234,8 @@ function mapPublishedLegalDocument(
     slug: document.slug,
     title: document.title,
     contentHtml: version.sanitizedContent,
+    documentId: document.id,
+    versionId: version.id,
     versionNumber: version.versionNumber,
     checksum: version.checksum,
     providerName: document.providerName,
