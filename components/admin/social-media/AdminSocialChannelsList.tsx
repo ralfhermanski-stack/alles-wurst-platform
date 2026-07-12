@@ -232,12 +232,23 @@ export default function AdminSocialChannelsList() {
           />
           <input
             className={inputClassName}
-            placeholder="Externe Kanal-ID"
+            placeholder={
+              form.platform === "INSTAGRAM"
+                ? "Instagram Business Account-ID"
+                : "Externe Kanal-ID"
+            }
             value={form.externalChannelId}
             onChange={(event) =>
               setForm({ ...form, externalChannelId: event.target.value })
             }
           />
+          {form.platform === "INSTAGRAM" && form.integrationMode === "API" && (
+            <p className="sm:col-span-2 text-xs text-aw-muted">
+              Für API-Sync: Modus „API-Sync“, Business Account-ID hier oder unter
+              Schnittstellen als Account-ID. Access Token unter Schnittstellen
+              hinterlegen, dann synchronisieren.
+            </p>
+          )}
           <input
             className={inputClassName}
             type="number"

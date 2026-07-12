@@ -11,6 +11,10 @@ import {
   encryptSocialCredential,
 } from "./social-credential-crypto";
 import {
+  fetchInstagramAccountInfo,
+  fetchInstagramMedia,
+} from "./providers/instagram-provider";
+import {
   fetchYouTubeChannelInfo,
   fetchYouTubePlaylistVideos,
 } from "./providers/youtube-provider";
@@ -190,6 +194,85 @@ async function syncYouTubeChannel(
   };
 }
 
+async function resolveInstagramAccountId(
+  channelId: string,
+  externalChannelId: string | null,
+): Promise<string | null> {
+  const credentialAccountId = await getSocialCredential(channelId, "account_id");
+
+  if (credentialAccountId?.trim()) {
+    return credentialAccountId.trim();
+  }
+
+  if (externalChannelId?.trim()) {
+    return externalChannelId.trim();
+  }
+
+  return null;
+}
+
+async function syncInstagramChannel(
+  channelId: string,
+): Promise<{ found: number; created: number; updated: number; skipped: number }> {
+  const channel = await prisma.socialMediaChannel.findUnique({
+    where: { id: channelId },
+  });
+
+  if (!channel) {
+    throw new Error("Instagram-Kanal nicht gefunden.");
+  }
+
+  const accountId = await resolveInstagramAccountId(
+    channelId,
+    channel.externalChannelId,
+  );
+
+  if (!accountId) {
+    throw new Error(
+      "Instagram Business Account-ID fehlt (externe Kanal-ID oder Account-ID in Schnittstellen).",
+    );
+  }
+
+  const accessToken = await getSocialCredential(channelId, "access_token");
+
+  if (!accessToken) {
+    throw new Error("Instagram Access Token nicht konfiguriert.");
+  }
+
+  const accountInfo = await fetchInstagramAccountInfo({
+    accessToken,
+    accountId,
+  });
+
+  const posts = await fetchInstagramMedia({ accessToken, accountId }, 12);
+  const counts = await upsertImportedPosts(channelId, posts);
+
+  await prisma.socialMediaChannel.update({
+    where: { id: channelId },
+    data: {
+      publicName: accountInfo.name ?? channel.publicName,
+      handle: accountInfo.username ?? channel.handle,
+      profileUrl:
+        channel.profileUrl ??
+        (accountInfo.username
+          ? `https://www.instagram.com/${accountInfo.username}/`
+          : null),
+      followerCount: accountInfo.followerCount,
+      followerCountUpdatedAt: accountInfo.followerCount ? new Date() : null,
+      coverImageUrl: channel.coverImageUrl ?? accountInfo.profilePictureUrl,
+      connectionStatus: "CONNECTED",
+      lastSyncedAt: new Date(),
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    },
+  });
+
+  return {
+    found: posts.length,
+    ...counts,
+  };
+}
+
 export async function syncSocialMediaChannel(
   channelId: string,
   triggeredBy = "manual",
@@ -219,6 +302,8 @@ export async function syncSocialMediaChannel(
     if (channel.integrationMode === "API") {
       if (channel.platform === "YOUTUBE") {
         result = await syncYouTubeChannel(channelId);
+      } else if (channel.platform === "INSTAGRAM") {
+        result = await syncInstagramChannel(channelId);
       } else {
         throw new Error(
           `${channel.platform}: API-Synchronisierung noch nicht eingerichtet. Bitte manuellen Modus verwenden.`,

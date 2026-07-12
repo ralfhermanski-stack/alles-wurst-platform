@@ -15,6 +15,7 @@ import {
   secondaryButtonClassName,
 } from "@/components/tools/recipe-generator/recipe-form-classes";
 import AdminYouTubeConnectionPanel from "@/components/admin/social-media/AdminYouTubeConnectionPanel";
+import AdminInstagramConnectionPanel from "@/components/admin/social-media/AdminInstagramConnectionPanel";
 
 const CREDENTIAL_FIELDS: Record<string, { type: string; label: string }[]> = {
   YOUTUBE: [
@@ -177,6 +178,9 @@ export default function AdminSocialIntegrations() {
               </div>
               {channel.platform === "YOUTUBE" && (
                 <AdminYouTubeConnectionPanel channel={channel} />
+              )}
+              {channel.platform === "INSTAGRAM" && (
+                <AdminInstagramConnectionPanel channel={channel} />
               )}
             </section>
           );

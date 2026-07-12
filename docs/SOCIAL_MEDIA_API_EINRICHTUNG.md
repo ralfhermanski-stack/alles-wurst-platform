@@ -31,13 +31,20 @@ Keine geheimen Werte in dieses Dokument eintragen.
 
 | Schritt | Aktion |
 |---------|--------|
-| Voraussetzung | Professionelles Instagram-Konto |
+| Voraussetzung | Professionelles Instagram-Konto (Business oder Creator) |
 | Meta-App | [Meta for Developers](https://developers.facebook.com/) |
 | Produkt | Instagram Graph API |
 | Verknüpfung | Facebook-Seite mit Instagram verbinden |
-| Token | Page/User Access Token mit `instagram_basic`, `instagram_content_publish` |
+| Token | Long-lived Page Access Token mit `instagram_basic`, `pages_show_list`, `pages_read_engagement` |
+| Account-ID | Instagram **Business Account ID** (numerisch) — nicht der @-Handle |
+| In Alles Wurst | Kanal → Modus **API-Sync**, externe Kanal-ID = Business Account ID |
+| Credentials | Schnittstellen → Access Token + Account-ID |
+| Sync | „Verbindung testen“ → „Jetzt synchronisieren“ |
+| Startseite | Kanal aktiv + „Auf Startseite anzeigen“ + Profil-URL |
 
-**Fallback:** Manuell oder Embed.
+**Account-ID ermitteln:** Meta Graph API Explorer → `me/accounts` → verbundene Page → `instagram_business_account`.
+
+**Fallback:** Modus „Manuell“ — Beiträge unter Marketing → Social Media → Beiträge pflegen.
 
 ## Facebook
 
