@@ -11,6 +11,11 @@ import type {
 import { prisma } from "@/lib/db/prisma";
 
 import { computeLegalChecksum } from "./legal-checksum";
+import {
+  FORUM_RULES_DEFAULT_HTML,
+  FORUM_RULES_DOCUMENT_SLUG,
+  FORUM_RULES_DOCUMENT_TITLE,
+} from "./forum-rules-default-content";
 import { normalizeLegalContent } from "./legal-html-sanitize";
 import { resolveLegalProviderHttpsUrl } from "./legal-provider-hosts";
 import {
@@ -55,6 +60,42 @@ export async function ensureDefaultLegalDocuments(): Promise<void> {
       update: {},
     });
   }
+
+  await ensureForumRulesDocumentPublished();
+}
+
+async function ensureForumRulesDocumentPublished(): Promise<void> {
+  const document = await prisma.legalDocument.upsert({
+    where: { slug: FORUM_RULES_DOCUMENT_SLUG },
+    create: {
+      type: "FORUM_RULES",
+      title: FORUM_RULES_DOCUMENT_TITLE,
+      slug: FORUM_RULES_DOCUMENT_SLUG,
+      status: "DRAFT",
+      publicVisible: true,
+      allowManualEditing: true,
+      autoPublish: true,
+      contentFormat: "HTML",
+    },
+    update: {
+      type: "FORUM_RULES",
+      title: FORUM_RULES_DOCUMENT_TITLE,
+      publicVisible: true,
+    },
+    include: { currentPublishedVersion: true },
+  });
+
+  if (document.currentPublishedVersion) {
+    return;
+  }
+
+  await importLegalDocumentVersion({
+    documentId: document.id,
+    content: FORUM_RULES_DEFAULT_HTML,
+    contentFormat: "HTML",
+    changeSummary: "Standard-Forenregeln initial veröffentlicht",
+    autoPublish: true,
+  });
 }
 
 function isIframeEmbedMode(integrationMode: string): boolean {

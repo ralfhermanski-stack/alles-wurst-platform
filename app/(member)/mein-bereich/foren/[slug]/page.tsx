@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import ForumComposer from "@/components/forums/ForumComposer";
+import ForumRulesAcceptanceModal from "@/components/forums/ForumRulesAcceptanceModal";
 import ForumThreadList from "@/components/forums/ForumThreadList";
 import type { ForumThreadEntry } from "@/lib/forums/forum-types";
+import { useForumRulesAcceptance } from "@/lib/forums/use-forum-rules-acceptance";
 import {
   inputClassName,
   primaryButtonClassName,
@@ -31,6 +32,8 @@ export default function MemberForumPage({
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
   const [creating, setCreating] = useState(false);
+  const canWriteForum = forum?.canWrite ?? false;
+  const rules = useForumRulesAcceptance(canWriteForum);
 
   async function loadForumData(forumSlug: string) {
     const [forumResponse, threadsResponse] = await Promise.all([
@@ -75,7 +78,7 @@ export default function MemberForumPage({
   }, [params]);
 
   async function handleCreateThread() {
-    if (!slug || !newTitle.trim() || !newBody.trim()) {
+    if (!slug || !newTitle.trim() || !newBody.trim() || rules.needsAcceptance) {
       return;
     }
 
@@ -91,12 +94,16 @@ export default function MemberForumPage({
     const data = (await response.json()) as {
       success: boolean;
       data?: ForumThreadEntry;
+      error?: { code?: string; message?: string };
     };
 
     setCreating(false);
 
     if (!data.success || !data.data) {
-      setError("Thema konnte nicht erstellt werden.");
+      if (data.error?.code === "FORUM_RULES_REQUIRED") {
+        await rules.refresh();
+      }
+      setError(data.error?.message ?? "Thema konnte nicht erstellt werden.");
       return;
     }
 
@@ -127,6 +134,17 @@ export default function MemberForumPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      {rules.status && (
+        <ForumRulesAcceptanceModal
+          open={rules.needsAcceptance}
+          status={rules.status}
+          submitting={rules.submitting}
+          onAccept={async () => {
+            await rules.accept();
+          }}
+        />
+      )}
+
       {forum.courseSlug && (
         <Link
           href={`/mein-bereich/kurse/${forum.courseSlug}`}
@@ -154,28 +172,37 @@ export default function MemberForumPage({
             <h2 className="font-display text-lg font-bold text-aw-cream">
               Neues Thema
             </h2>
-            <div className="mt-4 space-y-3">
-              <input
-                className={inputClassName}
-                placeholder="Titel"
-                value={newTitle}
-                onChange={(event) => setNewTitle(event.target.value)}
-              />
-              <textarea
-                className={`${inputClassName} min-h-28 w-full`}
-                placeholder="Dein Beitrag …"
-                value={newBody}
-                onChange={(event) => setNewBody(event.target.value)}
-              />
-              <button
-                type="button"
-                className={primaryButtonClassName}
-                disabled={creating || !newTitle.trim() || !newBody.trim()}
-                onClick={() => void handleCreateThread()}
-              >
-                {creating ? "Wird erstellt …" : "Thema erstellen"}
-              </button>
-            </div>
+            {rules.needsAcceptance ? (
+              <p className="mt-4 text-sm text-aw-muted">
+                Bitte akzeptiere zuerst die Forenregeln im Dialog, um ein Thema
+                zu erstellen.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <input
+                  className={inputClassName}
+                  placeholder="Titel"
+                  value={newTitle}
+                  onChange={(event) => setNewTitle(event.target.value)}
+                />
+                <textarea
+                  className={`${inputClassName} min-h-28 w-full`}
+                  placeholder="Dein Beitrag …"
+                  value={newBody}
+                  onChange={(event) => setNewBody(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className={primaryButtonClassName}
+                  disabled={
+                    creating || !newTitle.trim() || !newBody.trim() || rules.loading
+                  }
+                  onClick={() => void handleCreateThread()}
+                >
+                  {creating ? "Wird erstellt …" : "Thema erstellen"}
+                </button>
+              </div>
+            )}
           </section>
         )}
       </div>

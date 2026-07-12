@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 
 import ForumAuthor from "@/components/forums/ForumAuthor";
 import ForumComposer from "@/components/forums/ForumComposer";
+import ForumRulesAcceptanceModal from "@/components/forums/ForumRulesAcceptanceModal";
 import type { ForumThreadDetail } from "@/lib/forums/forum-types";
+import { useForumRulesAcceptance } from "@/lib/forums/use-forum-rules-acceptance";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("de-DE");
@@ -20,6 +22,7 @@ export default function MemberForumThreadPage({
   const [threadSlug, setThreadSlug] = useState<string | null>(null);
   const [thread, setThread] = useState<ForumThreadDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const rules = useForumRulesAcceptance(thread?.canWrite ?? false);
 
   async function loadThread(forumSlug: string, topicSlug: string) {
     const response = await fetch(
@@ -52,7 +55,7 @@ export default function MemberForumThreadPage({
   }, [params]);
 
   async function handleReply(body: string): Promise<boolean> {
-    if (!slug || !threadSlug) {
+    if (!slug || !threadSlug || rules.needsAcceptance) {
       return false;
     }
 
@@ -66,9 +69,15 @@ export default function MemberForumThreadPage({
       },
     );
 
-    const data = (await response.json()) as { success: boolean };
+    const data = (await response.json()) as {
+      success: boolean;
+      error?: { code?: string };
+    };
 
     if (!data.success) {
+      if (data.error?.code === "FORUM_RULES_REQUIRED") {
+        await rules.refresh();
+      }
       return false;
     }
 
@@ -103,6 +112,17 @@ export default function MemberForumThreadPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      {rules.status && (
+        <ForumRulesAcceptanceModal
+          open={rules.needsAcceptance}
+          status={rules.status}
+          submitting={rules.submitting}
+          onAccept={async () => {
+            await rules.accept();
+          }}
+        />
+      )}
+
       <Link
         href={`/mein-bereich/foren/${slug}`}
         className="text-sm text-aw-gold"
@@ -153,11 +173,17 @@ export default function MemberForumThreadPage({
           <h2 className="mb-3 font-display text-lg font-bold text-aw-cream">
             Antwort schreiben
           </h2>
-          <ForumComposer
-            placeholder="Deine Antwort …"
-            submitLabel="Antwort senden"
-            onSubmit={handleReply}
-          />
+          {rules.needsAcceptance ? (
+            <p className="text-sm text-aw-muted">
+              Bitte akzeptiere zuerst die Forenregeln im Dialog, um zu antworten.
+            </p>
+          ) : (
+            <ForumComposer
+              placeholder="Deine Antwort …"
+              submitLabel="Antwort senden"
+              onSubmit={handleReply}
+            />
+          )}
         </section>
       )}
     </div>

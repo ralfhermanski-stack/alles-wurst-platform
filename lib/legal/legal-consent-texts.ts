@@ -21,3 +21,11 @@ export const CHECKOUT_CONSENT_TEXTS_V1: CheckoutConsentTextSet = {
 };
 
 export const CHECKOUT_CONSENT_VERSION = "checkout-consent-v1";
+
+export const FORUM_RULES_CONSENT_TEXT =
+  "Ich habe die Forenregeln gelesen und akzeptiere sie. Mir ist bekannt, dass ich vor jedem Beitrag im Forum eine gültige Zustimmung benötige und diese alle drei Monate erneuert werden muss.";
+
+export const FORUM_RULES_ACCEPTANCE_TYPE = "FORUM_RULES";
+
+/** Gültigkeitsdauer der Forenregeln-Zustimmung (Vierteljahr). */
+export const FORUM_RULES_ACCEPTANCE_VALIDITY_DAYS = 90;

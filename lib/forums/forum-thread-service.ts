@@ -15,6 +15,7 @@ import {
 import { getPublicUserName } from "@/lib/users/public-user";
 import { buildPublicAvatarUrl } from "@/lib/users/user-avatar-storage";
 import { slugifyCourseTitle } from "@/lib/courses/course-types";
+import { requireForumRulesAcceptance } from "@/lib/legal/legal-acceptance-service";
 
 import { getPublicAuthorBadge } from "./forum-labels";
 import {
@@ -231,6 +232,11 @@ export async function createForumThread(
     return userFailure(forumNotFoundError());
   }
 
+  const rulesAcceptance = await requireForumRulesAcceptance(userId);
+  if (!rulesAcceptance.success) {
+    return rulesAcceptance;
+  }
+
   const title = input.title.trim();
   const body = input.body.trim();
 
@@ -291,6 +297,11 @@ export async function createForumPost(
 
   if (!(await canWriteForum(userId, forum, context))) {
     return userFailure(forumNotFoundError());
+  }
+
+  const rulesAcceptance = await requireForumRulesAcceptance(userId);
+  if (!rulesAcceptance.success) {
+    return rulesAcceptance;
   }
 
   const thread = await prisma.forumThread.findUnique({

@@ -10,6 +10,7 @@ export type UserErrorCode =
   | "CONFLICT"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
+  | "FORUM_RULES_REQUIRED"
   | "INTERNAL_ERROR";
 
 /** Strukturierter Fehler für Service- und API-Antworten */
@@ -48,6 +49,7 @@ export function userErrorToStatus(code: UserErrorCode): number {
     case "UNAUTHORIZED":
       return 401;
     case "FORBIDDEN":
+    case "FORUM_RULES_REQUIRED":
       return 403;
     case "NOT_FOUND":
       return 404;

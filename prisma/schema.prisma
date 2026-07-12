@@ -386,6 +386,7 @@ model User {
   withdrawalRequests         WithdrawalRequest[] @relation("WithdrawalUser")
   legalDocumentVersionsPublished LegalDocumentVersion[] @relation("LegalVersionPublisher")
   legalDocumentVersionsImported  LegalDocumentVersion[] @relation("LegalVersionImporter")
+  legalAcceptances               UserLegalAcceptance[]
   accountMessages            UserAccountMessage[]
   privacyRequests            PrivacyRequest[]
   privacyRequestsAssigned    PrivacyRequest[] @relation("PrivacyAssignee")
@@ -3252,6 +3253,7 @@ enum LegalDocumentType {
   WITHDRAWAL_POLICY
   WITHDRAWAL_FORM
   COOKIE_POLICY
+  FORUM_RULES
   OPTIONAL_OTHER
 }
 
@@ -3413,10 +3415,32 @@ model LegalDocumentVersion {
   createdAt DateTime @default(now()) @map("created_at")
 
   publishedForDocument LegalDocument? @relation("PublishedVersion")
+  userAcceptances      UserLegalAcceptance[]
 
   @@unique([documentId, versionNumber])
   @@index([documentId, status])
   @@map("legal_document_versions")
+}
+
+model UserLegalAcceptance {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  acceptanceType String @map("acceptance_type")
+
+  documentVersionId String?              @map("document_version_id") @db.Uuid
+  documentVersion   LegalDocumentVersion? @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
+  documentChecksum  String               @map("document_checksum")
+  labelText         String               @map("label_text") @db.Text
+
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+  validUntil DateTime @map("valid_until")
+
+  @@index([userId, acceptanceType, validUntil])
+  @@index([userId, acceptanceType, acceptedAt])
+  @@map("user_legal_acceptances")
 }
 
 model LegalDocumentSyncLog {

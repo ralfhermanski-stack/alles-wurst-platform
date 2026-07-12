@@ -57,6 +57,7 @@ export const LEGAL_DOCUMENT_SLUGS: Record<
   WITHDRAWAL_POLICY: "widerrufsbelehrung",
   WITHDRAWAL_FORM: "widerrufsformular",
   COOKIE_POLICY: "cookie-einstellungen",
+  FORUM_RULES: "forenregeln",
 };
 
 export const LEGAL_DOCUMENT_TYPE_LABELS: Record<LegalDocumentType, string> = {
@@ -66,6 +67,7 @@ export const LEGAL_DOCUMENT_TYPE_LABELS: Record<LegalDocumentType, string> = {
   WITHDRAWAL_POLICY: "Widerrufsbelehrung",
   WITHDRAWAL_FORM: "Widerrufsformular",
   COOKIE_POLICY: "Cookie-Richtlinie",
+  FORUM_RULES: "Forenregeln",
   OPTIONAL_OTHER: "Sonstiges",
 };
 
