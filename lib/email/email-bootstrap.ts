@@ -145,6 +145,23 @@ const TEMPLATE_SEEDS: Array<{
       "Hallo {{firstName}},\n\nKündigung bestätigt. Zugang bis {{periodEndLabel}}.\n\n{{manageUrl}}\n",
     allowedVariables: ["firstName", "roleLabel", "periodEndLabel", "manageUrl"],
   },
+  {
+    key: "beta.invite",
+    name: "Betatest-Einladung",
+    category: "SYSTEM",
+    subject: "Einladung zum Betatest — Alles Wurst",
+    htmlContent: `<p>Hallo {{firstName}},</p>{{introHtml}}{{personalMessageHtml}}{{taskListHtml}}${actionButtonHtml("Einladung annehmen", "{{inviteUrl}}")}<p style="color:#9ca3af;font-size:14px;">Der Link ist 14 Tage gültig.</p>`,
+    textContent:
+      "Hallo {{firstName}},\n\ndu wurdest zum Betatest von Alles Wurst eingeladen.\n\n{{taskListText}}\n\nEinladung annehmen: {{inviteUrl}}\n",
+    allowedVariables: [
+      "firstName",
+      "introHtml",
+      "personalMessageHtml",
+      "taskListHtml",
+      "taskListText",
+      "inviteUrl",
+    ],
+  },
 ];
 
 let bootstrapPromise: Promise<number> | null = null;
@@ -197,7 +214,11 @@ async function runEmailBootstrap(): Promise<number> {
   });
 
   if (!sender) {
-    const from = process.env.MAIL_FROM?.trim() || "noreply@localhost";
+    const providerSettings = (provider.settings ?? {}) as Record<string, unknown>;
+    const from =
+      process.env.MAIL_FROM?.trim() ||
+      String(providerSettings.user ?? "").trim() ||
+      "noreply@localhost";
     sender = await prisma.emailSenderIdentity.create({
       data: {
         providerConfigId: provider.id,

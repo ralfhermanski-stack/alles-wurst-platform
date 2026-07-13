@@ -118,12 +118,29 @@ export async function processEmailQueueBatch(): Promise<{
     processed += 1;
 
     try {
-      const runtime = message.senderIdentity?.providerConfig
-        ? buildRuntimeProviderFromConfig(
-            message.senderIdentity.providerConfig,
-            message.senderIdentity,
-          )
-        : buildEnvFallbackProvider(message.senderIdentity ?? undefined);
+      let senderIdentity = message.senderIdentity;
+      let providerConfig = senderIdentity?.providerConfig ?? null;
+
+      if (!providerConfig) {
+        const resolvedSender = await prisma.emailSenderIdentity.findFirst({
+          where: {
+            active: true,
+            verified: true,
+            providerConfig: { active: true },
+          },
+          include: { providerConfig: true },
+          orderBy: [{ defaultSender: "desc" }, { sortOrder: "asc" }],
+        });
+
+        if (resolvedSender?.providerConfig) {
+          senderIdentity = resolvedSender;
+          providerConfig = resolvedSender.providerConfig;
+        }
+      }
+
+      const runtime = providerConfig
+        ? buildRuntimeProviderFromConfig(providerConfig, senderIdentity ?? undefined)
+        : buildEnvFallbackProvider(senderIdentity ?? undefined);
 
       const result = await sendViaRuntimeProvider({
         runtime,
@@ -145,12 +162,18 @@ export async function processEmailQueueBatch(): Promise<{
             providerMessageId: result.providerMessageId ?? null,
             lastErrorCode: null,
             lastErrorMessage: null,
+            ...(senderIdentity?.id && !message.senderIdentityId
+              ? {
+                  senderIdentityId: senderIdentity.id,
+                  providerConfigId: senderIdentity.providerConfigId,
+                }
+              : {}),
           },
         });
 
-        if (message.senderIdentityId) {
+        if (senderIdentity?.id) {
           await prisma.emailSenderIdentity.update({
-            where: { id: message.senderIdentityId },
+            where: { id: senderIdentity.id },
             data: { lastSuccessfulSendAt: new Date(), lastError: null },
           });
         }

@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { registerApi } from "@/lib/auth/auth-client";
 import {
@@ -21,10 +21,18 @@ import {
   selectClassName,
 } from "@/components/tools/recipe-generator/recipe-form-classes";
 
-export default function RegisterForm() {
+export default function RegisterForm({
+  defaultEmail = "",
+  inviteToken,
+  emailReadOnly = false,
+}: {
+  defaultEmail?: string;
+  inviteToken?: string;
+  emailReadOnly?: boolean;
+}) {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [salutation, setSalutation] = useState("");
@@ -43,6 +51,12 @@ export default function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (defaultEmail) {
+      setEmail(defaultEmail);
+    }
+  }, [defaultEmail]);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -60,6 +74,7 @@ export default function RegisterForm() {
       email,
       password,
       recipeUserId,
+      inviteToken,
       profile: {
         salutation: salutation || null,
         firstName,
@@ -86,7 +101,7 @@ export default function RegisterForm() {
     }
 
     setRecipeUserId(response.data.user.id);
-    router.push("/mein-bereich");
+    router.push(inviteToken ? "/mein-bereich/betatest" : "/mein-bereich");
     router.refresh();
   }
 
@@ -113,7 +128,8 @@ export default function RegisterForm() {
             type="email"
             autoComplete="email"
             required
-            className={`${inputClassName} mt-2`}
+            readOnly={emailReadOnly}
+            className={`${inputClassName} mt-2 ${emailReadOnly ? "opacity-80" : ""}`}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />

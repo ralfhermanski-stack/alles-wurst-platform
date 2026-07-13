@@ -27,6 +27,7 @@ export function isMaintenanceExemptPath(pathname: string): boolean {
     || pathname === "/anmelden"
     || pathname === "/login"
     || pathname === "/registrieren"
+    || pathname === "/einladung"
     || pathname === "/favicon.ico"
     || pathname.startsWith("/images/")
   ) {

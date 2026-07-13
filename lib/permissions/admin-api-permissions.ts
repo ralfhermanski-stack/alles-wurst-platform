@@ -29,6 +29,7 @@ export const ADMIN_API_PERMISSIONS: AdminApiPermissionDef[] = [
   { pathPrefix: "/api/admin/page-seo", permissionKey: "admin.seo.view" },
   { pathPrefix: "/api/admin/maintenance", permissionKey: "admin.maintenance.view" },
   { pathPrefix: "/api/admin/wartungsmodus", permissionKey: "admin.maintenance.view" },
+  { pathPrefix: "/api/admin/beta-test", permissionKey: "admin.maintenance.view" },
   { pathPrefix: "/api/admin/page-editor", permissionKey: "admin.media.manage" },
   { pathPrefix: "/api/admin/platform-text", permissionKey: "admin.media.manage" },
   { pathPrefix: "/api/admin/legal", permissionKey: "admin.privacy.view" },

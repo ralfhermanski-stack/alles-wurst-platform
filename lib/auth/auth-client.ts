@@ -80,6 +80,7 @@ export type RegisterApiInput = {
   password: string;
   profile: UserProfileInput;
   recipeUserId?: string;
+  inviteToken?: string;
 };
 
 export async function registerApi(

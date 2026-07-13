@@ -414,6 +414,10 @@ model User {
   totpBackupCodes                TotpBackupCode[]
   suspiciousUserFlags            SuspiciousUserFlag[]
   blockedIpsCreated              BlockedIp[] @relation("BlockedIpCreatedBy")
+  betaInvitesSent                BetaInvite[] @relation("BetaInvitesSent")
+  betaInvitesAccepted            BetaInvite[] @relation("BetaInvitesAccepted")
+  betaTesterTasks                BetaTesterTask[] @relation("BetaTesterTasks")
+  betaTesterTasksAssigned        BetaTesterTask[] @relation("BetaTasksAssigned")
 
   @@index([deletedAt])
   @@map("users")
@@ -4947,4 +4951,85 @@ model SecuritySettings {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("security_settings")
+}
+
+// -----------------------------------------------------------------------------
+// Betatest — Einladungen und Tester-Aufträge
+// -----------------------------------------------------------------------------
+
+enum BetaInviteStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum BetaTaskStatus {
+  OPEN
+  COMPLETED
+}
+
+model BetaInvite {
+  id String @id @default(uuid()) @db.Uuid
+
+  email     String
+  emailNorm String @map("email_norm")
+
+  tokenHash String @unique @map("token_hash")
+
+  invitedById String @map("invited_by_id") @db.Uuid
+  invitedBy   User   @relation("BetaInvitesSent", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation("BetaInvitesAccepted", fields: [userId], references: [id], onDelete: SetNull)
+
+  status BetaInviteStatus @default(PENDING)
+
+  personalMessage String? @map("personal_message") @db.Text
+
+  expiresAt  DateTime  @map("expires_at")
+  sentAt     DateTime? @map("sent_at")
+  acceptedAt DateTime? @map("accepted_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tasks BetaTesterTask[]
+
+  @@index([emailNorm])
+  @@index([status])
+  @@index([userId])
+  @@map("beta_invites")
+}
+
+model BetaTesterTask {
+  id String @id @default(uuid()) @db.Uuid
+
+  inviteId String?     @map("invite_id") @db.Uuid
+  invite   BetaInvite? @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation("BetaTesterTasks", fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedById String @map("assigned_by_id") @db.Uuid
+  assignedBy   User   @relation("BetaTasksAssigned", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  title       String
+  description String? @db.Text
+
+  status BetaTaskStatus @default(OPEN)
+
+  sortOrder Int @default(0) @map("sort_order")
+
+  dueAt       DateTime? @map("due_at")
+  completedAt DateTime? @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@index([inviteId])
+  @@map("beta_tester_tasks")
 }

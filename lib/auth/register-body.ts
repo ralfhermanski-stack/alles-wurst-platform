@@ -36,6 +36,7 @@ export function parseRegisterBody(
   const email = readString(body, "email");
   const password = readString(body, "password");
   const recipeUserId = readString(body, "recipeUserId");
+  const inviteToken = readString(body, "inviteToken");
   const profileRaw = body.profile;
 
   if (!email || !password) {
@@ -82,6 +83,7 @@ export function parseRegisterBody(
     email,
     password,
     recipeUserId: recipeUserId ?? null,
+    inviteToken: inviteToken ?? null,
     profile: {
       salutation: readNullableString(profileObj, "salutation"),
       firstName,

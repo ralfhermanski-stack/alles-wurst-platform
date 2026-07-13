@@ -50,6 +50,7 @@ export const ADMIN_NAV_PERMISSION_BY_HREF: Record<string, string> = {
   "/admin/datenschutz": "admin.privacy.view",
   "/admin/inhalte/medien": "admin.media.view",
   "/admin/wartungsmodus": "admin.maintenance.view",
+  "/admin/betatest": "admin.maintenance.view",
   "/admin/system/testdaten": "admin.system-settings.view",
   "/admin/seo": "admin.seo.view",
   "/admin/statistiken": "admin.analytics.view",

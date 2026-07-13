@@ -281,28 +281,30 @@ export async function upsertEmailProvider(input: {
         )
       : undefined;
 
-  if (input.id) {
-    return prisma.emailProviderConfig.update({
-      where: { id: input.id },
-      data: {
-        providerType: input.providerType,
-        name: input.name,
-        active: input.active ?? true,
-        settings: (input.settings ?? {}) as Prisma.InputJsonValue,
-        ...(encryptedCredentials ? { encryptedCredentials } : {}),
-      },
-    });
-  }
+  const row = input.id
+    ? await prisma.emailProviderConfig.update({
+        where: { id: input.id },
+        data: {
+          providerType: input.providerType,
+          name: input.name,
+          active: input.active ?? true,
+          settings: (input.settings ?? {}) as Prisma.InputJsonValue,
+          ...(encryptedCredentials ? { encryptedCredentials } : {}),
+        },
+      })
+    : await prisma.emailProviderConfig.create({
+        data: {
+          providerType: input.providerType,
+          name: input.name,
+          active: input.active ?? false,
+          settings: (input.settings ?? {}) as Prisma.InputJsonValue,
+          encryptedCredentials: encryptedCredentials ?? null,
+        },
+      });
 
-  return prisma.emailProviderConfig.create({
-    data: {
-      providerType: input.providerType,
-      name: input.name,
-      active: input.active ?? false,
-      settings: (input.settings ?? {}) as Prisma.InputJsonValue,
-      encryptedCredentials: encryptedCredentials ?? null,
-    },
-  });
+  await ensureEmailSystemDefaults();
+
+  return row;
 }
 
 export async function upsertEmailSender(input: {

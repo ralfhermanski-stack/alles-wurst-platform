@@ -81,6 +81,7 @@ export const adminNavSections: AdminNavSection[] = [
     label: "System",
     items: [
       { label: "Wartungsmodus", href: "/admin/wartungsmodus" },
+      { label: "Betatest", href: "/admin/betatest" },
       { label: "Testdaten", href: "/admin/system/testdaten" },
       { label: "SEO", href: "/admin/seo" },
       { label: "Statistiken", href: "/admin/statistiken" },

@@ -40,6 +40,7 @@ export type RegisterInput = {
   password: string;
   profile: UserProfileInput;
   recipeUserId?: string | null;
+  inviteToken?: string | null;
 };
 
 export type LoginInput = {
