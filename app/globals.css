@@ -84,3 +84,95 @@ body {
     margin-bottom: 0;
   }
 }
+
+/* Magazin: Rich-Text-Ausgabe und Editor */
+.prose-blog.rich-text-content p,
+.rich-text-editor__content p {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.75rem;
+  color: var(--color-aw-muted);
+}
+
+.prose-blog.rich-text-content p:first-child,
+.rich-text-editor__content p:first-child {
+  margin-top: 0;
+}
+
+.prose-blog.rich-text-content h2,
+.rich-text-editor__content h2 {
+  margin-top: 1.25rem;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-aw-cream);
+}
+
+.prose-blog.rich-text-content h3,
+.rich-text-editor__content h3 {
+  margin-top: 1rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-aw-cream);
+}
+
+.prose-blog.rich-text-content ul,
+.prose-blog.rich-text-content ol,
+.rich-text-editor__content ul,
+.rich-text-editor__content ol {
+  margin-top: 0.5rem;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.75rem;
+  color: var(--color-aw-muted);
+}
+
+.prose-blog.rich-text-content ul,
+.rich-text-editor__content ul {
+  list-style-type: disc;
+}
+
+.prose-blog.rich-text-content ol,
+.rich-text-editor__content ol {
+  list-style-type: decimal;
+}
+
+.prose-blog.rich-text-content li + li,
+.rich-text-editor__content li + li {
+  margin-top: 0.25rem;
+}
+
+.prose-blog.rich-text-content blockquote,
+.rich-text-editor__content blockquote {
+  margin-top: 0.75rem;
+  border-left: 3px solid color-mix(in srgb, var(--color-aw-gold) 50%, transparent);
+  padding-left: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.75rem;
+  color: var(--color-aw-muted);
+  font-style: italic;
+}
+
+.prose-blog.rich-text-content a {
+  color: var(--color-aw-gold);
+  text-decoration: underline;
+}
+
+.prose-blog.rich-text-content a:hover {
+  color: var(--color-aw-cream);
+}
+
+.prose-blog.rich-text-content strong,
+.rich-text-editor__content strong {
+  font-weight: 600;
+  color: var(--color-aw-cream);
+}
+
+.rich-text-editor__content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--color-aw-muted) 60%, transparent);
+}

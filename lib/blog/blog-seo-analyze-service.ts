@@ -6,9 +6,11 @@
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma, UserSystemRole } from "@prisma/client";
 
+import { bodyToPlainText } from "@/lib/content/rich-body-utils";
+
 import { getBlogLinkSuggestions, updateBlogPost, upsertBlogTag } from "./blog-admin-service";
 import { analyzeBlogSeoContent, isValidSchemaJson } from "./blog-seo-ai-service";
-import { extractHeadingsFromMarkdown, markdownToPlainText } from "./blog-seo-text-utils";
+import { extractHeadingsFromMarkdown } from "./blog-seo-text-utils";
 import type { BlogSeoAnalysisInput, BlogSeoAnalysisResult } from "./blog-types";
 import { parseStoredSeoDraft } from "./blog-types";
 import { canWriteBlogPost } from "./blog-permissions";
@@ -38,7 +40,7 @@ function buildAnalysisInput(
     readingTimeMinutes: row.readingTimeMinutes,
     tagNames: row.tags.map((entry) => entry.tag.name),
     headings: extractHeadingsFromMarkdown(row.body),
-    plainText: markdownToPlainText(row.body),
+    plainText: bodyToPlainText(row.body),
   };
 }
 

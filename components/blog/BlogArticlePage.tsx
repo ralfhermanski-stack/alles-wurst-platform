@@ -6,7 +6,7 @@ import BlogAuthorBox from "@/components/blog/BlogAuthorBox";
 import BlogToc, { BlogCtaBoxes, BlogFaqSection } from "@/components/blog/BlogArticleSections";
 import BlogCoverImage from "@/components/blog/BlogCoverImage";
 import BlogStructuredData from "@/components/blog/BlogStructuredData";
-import Markdown from "@/components/ui/Markdown";
+import RichTextContent from "@/components/ui/RichTextContent";
 import { getBlogPostUrl } from "@/lib/blog/blog-seo";
 import type { BlogPostDetail } from "@/lib/blog/blog-types";
 
@@ -91,7 +91,7 @@ export default function BlogArticlePage({ post }: { post: BlogPostDetail }) {
           {/* Artikelinhalt */}
           <div className="min-w-0 space-y-8 lg:col-start-2 lg:row-start-2">
             <div className="prose-blog max-w-none text-aw-cream/90">
-              <Markdown content={post.body} />
+              <RichTextContent content={post.body} />
             </div>
 
             {/* Mobile: TOC + Autor unter dem Einstieg */}

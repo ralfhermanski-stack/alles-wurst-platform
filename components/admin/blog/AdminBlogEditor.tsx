@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import MarkdownField from "@/components/admin/MarkdownField";
+import RichTextField from "@/components/admin/RichTextField";
 import AdminBlogSeoAiPanel from "@/components/admin/blog/AdminBlogSeoAiPanel";
 import BlogCoverImage from "@/components/blog/BlogCoverImage";
 import {
@@ -520,12 +520,13 @@ export default function AdminBlogEditor({ postId }: AdminBlogEditorProps) {
             <label className={labelClassName}>Zusammenfassung am Artikelanfang (KI-freundlich)</label>
             <textarea className={inputClassName} rows={3} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} />
           </div>
-          <MarkdownField
+          <RichTextField
             id="blog-body"
-            label="Haupttext (Markdown)"
+            label="Haupttext"
             value={form.body}
             onChange={(body) => setForm({ ...form, body })}
-            minHeight="420px"
+            helpText="Formatierung wie in Word — Text markieren und Toolbar nutzen oder aus Word/Google Docs einfügen."
+            minHeight="min-h-[420px]"
           />
           <div className="grid gap-4 md:grid-cols-2">
             <div>

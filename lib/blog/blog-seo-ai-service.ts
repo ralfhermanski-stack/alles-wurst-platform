@@ -3,6 +3,8 @@
  * @purpose Automatische SEO- & KI-Analyse für Blogartikel (OpenAI + Fallback).
  */
 
+import { bodyToPlainText } from "@/lib/content/rich-body-utils";
+
 import {
   assessReadability,
   buildBlogPostingJsonLd,
@@ -17,7 +19,6 @@ import {
   extractFrequentKeywords,
   extractHeadingsFromMarkdown,
   extractParagraphAfterHeading,
-  markdownToPlainText,
   truncateSeoTitle,
 } from "./blog-seo-text-utils";
 import type { BlogFaqItem, BlogSeoAnalysisInput, BlogSeoAnalysisResult } from "./blog-types";
@@ -207,7 +208,7 @@ export function buildFallbackSeoAnalysis(
   input: BlogSeoAnalysisInput,
   linkCandidates: { title: string; url: string; keywords: string[] }[] = [],
 ): BlogSeoAnalysisResult {
-  const plainText = input.plainText || markdownToPlainText(input.body);
+  const plainText = input.plainText || bodyToPlainText(input.body);
   const keywords = extractFrequentKeywords(plainText);
   const focusKeyword = keywords[0] ?? input.title.split(/\s+/).slice(0, 2).join(" ").toLowerCase();
 

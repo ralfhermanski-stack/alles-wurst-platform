@@ -15,6 +15,8 @@
 
 import type { ReactNode } from "react";
 
+import { slugifyHeading } from "@/lib/content/rich-body-utils";
+
 const INLINE_PATTERN = /(\*\*([^*]+)\*\*|\*([^*\n]+)\*|_([^_\n]+)_)/g;
 
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
@@ -124,18 +126,19 @@ function parseBlocks(markdown: string, variant: MarkdownVariant): ReactNode[] {
             ? "mt-4 font-display text-lg font-bold text-aw-cream"
             : "mt-3 font-display text-base font-semibold text-aw-cream";
       const key = `h-${blockIndex}`;
+      const headingId = slugifyHeading(text);
 
       blocks.push(
         level === 1 ? (
-          <h3 key={key} className={className}>
+          <h3 key={key} id={headingId || undefined} className={className}>
             {renderInline(text, key)}
           </h3>
         ) : level === 2 ? (
-          <h4 key={key} className={className}>
+          <h4 key={key} id={headingId || undefined} className={className}>
             {renderInline(text, key)}
           </h4>
         ) : (
-          <h5 key={key} className={className}>
+          <h5 key={key} id={headingId || undefined} className={className}>
             {renderInline(text, key)}
           </h5>
         ),

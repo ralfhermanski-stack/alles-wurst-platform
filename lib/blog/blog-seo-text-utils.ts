@@ -3,6 +3,8 @@
  * @purpose Textbereinigung für SEO-/KI-Analyse.
  */
 
+import { bodyToPlainText, extractHeadingsFromBody } from "@/lib/content/rich-body-utils";
+
 const GERMAN_STOP_WORDS = new Set([
   "aber", "alle", "als", "also", "andere", "auch", "auf", "aus", "bei", "bin",
   "bis", "bist", "da", "damit", "dann", "das", "dass", "dein", "deine", "dem",
@@ -27,17 +29,7 @@ export function markdownToPlainText(markdown: string): string {
 }
 
 export function extractHeadingsFromMarkdown(body: string): string[] {
-  const headings: string[] = [];
-
-  for (const line of body.split("\n")) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
-      headings.push(trimmed.replace(/^#+\s+/, "").trim());
-    }
-  }
-
-  return headings;
+  return extractHeadingsFromBody(body);
 }
 
 export function truncateText(text: string, maxLength: number): string {
@@ -123,7 +115,7 @@ export function extractParagraphAfterHeading(body: string, heading: string): str
 }
 
 export function computeReadabilityScore(body: string): number {
-  const plain = markdownToPlainText(body);
+  const plain = bodyToPlainText(body);
   const words = plain.split(/\s+/).filter(Boolean).length;
 
   if (words === 0) {

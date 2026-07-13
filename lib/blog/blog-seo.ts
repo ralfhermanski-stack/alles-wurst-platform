@@ -3,6 +3,13 @@
  * @purpose SEO-, Qualitäts- und Structured-Data-Hilfen für Blogartikel.
  */
 
+import {
+  bodyToPlainText,
+  countHeadingsInBody,
+  countWordsInBody,
+  extractTableOfContentsFromBody,
+} from "@/lib/content/rich-body-utils";
+
 import type { BlogPostDetail, BlogQualityIssue, BlogQualityReport } from "./blog-types";
 import {
   BLOG_MIN_WORD_COUNT,
@@ -22,36 +29,16 @@ export function getBlogPostUrl(slug: string): string {
 }
 
 export function calculateReadingTimeMinutes(body: string): number {
-  const words = body
-    .replace(/[#*_`>\-\[\]()!]/g, " ")
-    .split(/\s+/)
-    .filter(Boolean).length;
-
+  const words = countWordsInBody(body);
   return Math.max(1, Math.ceil(words / 200));
 }
 
 export function countWords(text: string): number {
-  return text
-    .replace(/[#*_`>\-\[\]()!]/g, " ")
-    .split(/\s+/)
-    .filter(Boolean).length;
+  return countWordsInBody(text);
 }
 
 export function countHeadings(body: string): { h1: number; h2: number; h3: number } {
-  const lines = body.split("\n");
-  let h1 = 0;
-  let h2 = 0;
-  let h3 = 0;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("# ")) h1 += 1;
-    else if (trimmed.startsWith("## ")) h2 += 1;
-    else if (trimmed.startsWith("### ")) h3 += 1;
-  }
-
-  return { h1, h2, h3 };
+  return countHeadingsInBody(body);
 }
 
 export function estimateKeywordDensity(body: string, keyword: string): number {
@@ -74,8 +61,9 @@ export function estimateKeywordDensity(body: string, keyword: string): number {
 }
 
 export function assessReadability(body: string): "beginner" | "intermediate" | "advanced" {
-  const words = countWords(body);
-  const sentences = body.split(/[.!?]+/).filter((part) => part.trim()).length || 1;
+  const plain = bodyToPlainText(body);
+  const words = plain.split(/\s+/).filter(Boolean).length;
+  const sentences = plain.split(/[.!?]+/).filter((part) => part.trim()).length || 1;
   const avgWordsPerSentence = words / sentences;
 
   if (avgWordsPerSentence <= 16) {
@@ -90,42 +78,7 @@ export function assessReadability(body: string): "beginner" | "intermediate" | "
 }
 
 export function extractTableOfContents(body: string): { id: string; label: string; level: 2 | 3 }[] {
-  const items: { id: string; label: string; level: 2 | 3 }[] = [];
-
-  for (const line of body.split("\n")) {
-    const trimmed = line.trim();
-    let level: 2 | 3 | null = null;
-    let label = "";
-
-    if (trimmed.startsWith("## ")) {
-      level = 2;
-      label = trimmed.slice(3).trim();
-    } else if (trimmed.startsWith("### ")) {
-      level = 3;
-      label = trimmed.slice(4).trim();
-    }
-
-    if (!level || !label) {
-      continue;
-    }
-
-    const id = slugifyHeading(label);
-
-    items.push({ id, label, level });
-  }
-
-  return items;
-}
-
-function slugifyHeading(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/ä/g, "ae")
-    .replace(/ö/g, "oe")
-    .replace(/ü/g, "ue")
-    .replace(/ß/g, "ss")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return extractTableOfContentsFromBody(body);
 }
 
 export function runBlogQualityCheck(
