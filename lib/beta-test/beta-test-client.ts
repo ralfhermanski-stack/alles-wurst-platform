@@ -2,7 +2,7 @@
  * @file beta-test-client.ts
  */
 
-import { adminFetch, type AdminApiResponse } from "@/lib/admin/admin-platform-client";
+import { adminFetch, type AdminApiResponse } from "@/lib/admin/admin-fetch";
 import type {
   BetaInviteDetail,
   BetaInviteListItem,
