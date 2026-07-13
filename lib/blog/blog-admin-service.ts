@@ -43,6 +43,8 @@ import {
   parseSchemaJson,
   parseStoredSeoDraft,
   parseStringArray,
+  parseUuidArray,
+  filterValidUuidStrings,
 } from "./blog-types";
 
 const postInclude = {
@@ -137,9 +139,9 @@ function mapDetail(row: PostRow, related: BlogPostSummary[] = []): BlogAdminPost
     faqItems: parseFaqItems(row.faqItems),
     definitionBoxes: parseDefinitionBoxes(row.definitionBoxes),
     internalLinks: parseInternalLinks(row.internalLinks),
-    relatedPostIds: parseStringArray(row.relatedPostIds),
-    linkedCourseIds: parseStringArray(row.linkedCourseIds),
-    linkedRecipeIds: parseStringArray(row.linkedRecipeIds),
+    relatedPostIds: parseUuidArray(row.relatedPostIds),
+    linkedCourseIds: parseUuidArray(row.linkedCourseIds),
+    linkedRecipeIds: parseUuidArray(row.linkedRecipeIds),
     ctaConfig: parseCtaConfig(row.ctaConfig),
     reviewedByName: row.reviewedByName,
     expertNote: row.expertNote,
@@ -242,7 +244,7 @@ export async function getAdminBlogPostDetail(
     return null;
   }
 
-  const relatedIds = parseStringArray(row.relatedPostIds);
+  const relatedIds = parseUuidArray(row.relatedPostIds);
   let related: BlogPostSummary[] = [];
 
   if (relatedIds.length > 0) {
@@ -319,17 +321,17 @@ export async function createBlogPost(
       summary: input.summary ?? null,
       body,
       authorUserId,
-      categoryId: input.categoryId ?? null,
+      categoryId: input.categoryId && isValidUuid(input.categoryId) ? input.categoryId : null,
       focusKeyword: input.focusKeyword ?? null,
       readingTimeMinutes,
-      tags: input.tagIds?.length
+      tags: filterValidUuidStrings(input.tagIds ?? []).length
         ? {
-            create: input.tagIds.map((tagId) => ({ tagId })),
+            create: filterValidUuidStrings(input.tagIds ?? []).map((tagId) => ({ tagId })),
           }
         : undefined,
-      topics: input.topicIds?.length
+      topics: filterValidUuidStrings(input.topicIds ?? []).length
         ? {
-            create: input.topicIds.map((topicId) => ({
+            create: filterValidUuidStrings(input.topicIds ?? []).map((topicId) => ({
               topicId,
               isPrimary: topicId === input.primaryTopicId,
             })),
@@ -404,7 +406,7 @@ export async function updateBlogPost(
     data.readingTimeMinutes = calculateReadingTimeMinutes(input.body);
   }
   if (input.categoryId !== undefined) {
-    data.category = input.categoryId
+    data.category = input.categoryId && isValidUuid(input.categoryId)
       ? { connect: { id: input.categoryId } }
       : { disconnect: true };
   }
@@ -441,9 +443,15 @@ export async function updateBlogPost(
   if (input.faqItems !== undefined) data.faqItems = input.faqItems;
   if (input.definitionBoxes !== undefined) data.definitionBoxes = input.definitionBoxes;
   if (input.internalLinks !== undefined) data.internalLinks = input.internalLinks;
-  if (input.relatedPostIds !== undefined) data.relatedPostIds = input.relatedPostIds;
-  if (input.linkedCourseIds !== undefined) data.linkedCourseIds = input.linkedCourseIds;
-  if (input.linkedRecipeIds !== undefined) data.linkedRecipeIds = input.linkedRecipeIds;
+  if (input.relatedPostIds !== undefined) {
+    data.relatedPostIds = filterValidUuidStrings(input.relatedPostIds);
+  }
+  if (input.linkedCourseIds !== undefined) {
+    data.linkedCourseIds = filterValidUuidStrings(input.linkedCourseIds);
+  }
+  if (input.linkedRecipeIds !== undefined) {
+    data.linkedRecipeIds = filterValidUuidStrings(input.linkedRecipeIds);
+  }
   if (input.ctaConfig !== undefined) data.ctaConfig = input.ctaConfig;
   if (input.reviewedByName !== undefined) data.reviewedByName = input.reviewedByName;
   if (input.expertNote !== undefined) data.expertNote = input.expertNote;
@@ -475,21 +483,23 @@ export async function updateBlogPost(
   }
 
   if (input.tagIds !== undefined) {
+    const tagIds = filterValidUuidStrings(input.tagIds);
     await prisma.blogPostTag.deleteMany({ where: { postId } });
 
-    if (input.tagIds.length > 0) {
+    if (tagIds.length > 0) {
       await prisma.blogPostTag.createMany({
-        data: input.tagIds.map((tagId) => ({ postId, tagId })),
+        data: tagIds.map((tagId) => ({ postId, tagId })),
       });
     }
   }
 
   if (input.topicIds !== undefined) {
+    const topicIds = filterValidUuidStrings(input.topicIds);
     await prisma.blogPostTopic.deleteMany({ where: { postId } });
 
-    if (input.topicIds.length > 0) {
+    if (topicIds.length > 0) {
       await prisma.blogPostTopic.createMany({
-        data: input.topicIds.map((topicId) => ({
+        data: topicIds.map((topicId) => ({
           postId,
           topicId,
           isPrimary: topicId === input.primaryTopicId,
@@ -727,7 +737,7 @@ export async function getRelatedBlogPosts(
     return [];
   }
 
-  const manualIds = parseStringArray(post.relatedPostIds);
+  const manualIds = parseUuidArray(post.relatedPostIds);
 
   if (manualIds.length > 0) {
     const rows = await prisma.blogPost.findMany({

@@ -771,8 +771,9 @@ export default function AdminBlogEditor({ postId }: AdminBlogEditorProps) {
             </div>
           )}
           <div>
-            <label className={labelClassName}>Verwandte Artikel (Post-IDs, kommagetrennt)</label>
+            <label className={labelClassName}>Verwandte Artikel (Artikel-IDs, kommagetrennt)</label>
             <input className={inputClassName} value={form.relatedPostIds} onChange={(e) => setForm({ ...form, relatedPostIds: e.target.value })} />
+            <p className="mt-1 text-xs text-aw-muted">Nur interne Artikel-UUIDs — keine URLs. Für Seitenlinks den Tab „Links“ nutzen.</p>
           </div>
         </div>
       )}

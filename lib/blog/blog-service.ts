@@ -23,6 +23,7 @@ import {
   parseInternalLinks,
   parseSchemaJson,
   parseStringArray,
+  parseUuidArray,
 } from "./blog-types";
 
 const postInclude = {
@@ -85,9 +86,9 @@ function mapDetail(row: PostRow, related: BlogPostSummary[]): BlogPostDetail {
     faqItems: parseFaqItems(row.faqItems),
     definitionBoxes: parseDefinitionBoxes(row.definitionBoxes),
     internalLinks: parseInternalLinks(row.internalLinks),
-    relatedPostIds: parseStringArray(row.relatedPostIds),
-    linkedCourseIds: parseStringArray(row.linkedCourseIds),
-    linkedRecipeIds: parseStringArray(row.linkedRecipeIds),
+    relatedPostIds: parseUuidArray(row.relatedPostIds),
+    linkedCourseIds: parseUuidArray(row.linkedCourseIds),
+    linkedRecipeIds: parseUuidArray(row.linkedRecipeIds),
     ctaConfig: parseCtaConfig(row.ctaConfig),
     reviewedByName: row.reviewedByName,
     expertNote: row.expertNote,
