@@ -101,8 +101,8 @@ export default function RegisterForm({
     }
 
     setRecipeUserId(response.data.user.id);
-    router.push(inviteToken ? "/mein-bereich/betatest" : "/mein-bereich");
-    router.refresh();
+    const target = inviteToken ? "/mein-bereich/betatest" : "/mein-bereich";
+    window.location.assign(target);
   }
 
   return (

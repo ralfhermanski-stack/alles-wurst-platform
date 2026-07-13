@@ -331,11 +331,17 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/anmelden", request.url));
     }
 
-    if (isAdminLikeRole(session?.systemRole) || canBypassMaintenance(session)) {
+    if (isAdminLikeRole(session?.systemRole)) {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
 
     if (session?.systemRole === "USER") {
+      const next = request.nextUrl.searchParams.get("next");
+
+      if (next && next.startsWith("/") && !next.startsWith("//")) {
+        return NextResponse.redirect(new URL(next, request.url));
+      }
+
       return NextResponse.redirect(new URL("/mein-bereich", request.url));
     }
   }
