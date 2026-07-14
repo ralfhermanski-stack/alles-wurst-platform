@@ -10,6 +10,7 @@ import {
   isTokenExpired,
   verifyPlainTokenHash,
 } from "@/lib/auth/auth-token";
+import { createUserAccountMessage } from "@/lib/account/account-message-service";
 import { buildAppUrl } from "@/lib/mail/mail-service";
 import { sendPlatformEmail } from "@/lib/email/email-service";
 import { actionButtonHtml, wrapPlatformEmailHtml } from "@/lib/email/email-layout";
@@ -677,6 +678,188 @@ export async function reopenBetaTaskForUser(input: {
     dueAt: updated.dueAt?.toISOString() ?? null,
     completedAt: updated.completedAt?.toISOString() ?? null,
     sortOrder: updated.sortOrder,
+  };
+}
+
+export type BetaBroadcastAudience = "accepted" | "invited";
+
+export type BetaBroadcastResult = {
+  recipientCount: number;
+  emailQueued: number;
+  accountMessagesCreated: number;
+  skippedNoAccount: number;
+};
+
+type BetaBroadcastRecipient = {
+  email: string;
+  userId: string | null;
+  firstName: string | null;
+};
+
+function resolveBroadcastAudienceFilter(audience: BetaBroadcastAudience) {
+  if (audience === "accepted") {
+    return { status: "ACCEPTED" as const };
+  }
+
+  return { status: { in: ["SENT", "ACCEPTED"] as BetaInviteStatus[] } };
+}
+
+async function listBetaBroadcastRecipients(
+  audience: BetaBroadcastAudience,
+): Promise<BetaBroadcastRecipient[]> {
+  const rows = await prisma.betaInvite.findMany({
+    where: resolveBroadcastAudienceFilter(audience),
+    include: {
+      user: {
+        include: {
+          profile: {
+            select: { firstName: true },
+          },
+        },
+      },
+    },
+    orderBy: [{ createdAt: "desc" }],
+  });
+
+  const seen = new Set<string>();
+  const recipients: BetaBroadcastRecipient[] = [];
+
+  for (const row of rows) {
+    const key = normalizeEmail(row.email);
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    recipients.push({
+      email: row.email,
+      userId: row.userId,
+      firstName: row.user?.profile?.firstName?.trim() || null,
+    });
+  }
+
+  return recipients;
+}
+
+export async function countBetaBroadcastRecipients(
+  audience: BetaBroadcastAudience,
+): Promise<number> {
+  const recipients = await listBetaBroadcastRecipients(audience);
+  return recipients.length;
+}
+
+function formatBroadcastGreeting(firstName: string | null): string {
+  return firstName ? `Hallo ${escapeHtml(firstName)},` : "Hallo,";
+}
+
+function formatBroadcastGreetingText(firstName: string | null): string {
+  return firstName ? `Hallo ${firstName},` : "Hallo,";
+}
+
+export async function sendBetaBroadcastMessage(input: {
+  subject: string;
+  message: string;
+  audience: BetaBroadcastAudience;
+  sendEmail: boolean;
+  sendAccountMessage: boolean;
+  requestedByUserId: string;
+}): Promise<BetaBroadcastResult> {
+  const subject = input.subject.trim();
+  const message = input.message.trim();
+
+  if (!subject) {
+    throw new Error("Betreff ist erforderlich.");
+  }
+
+  if (!message) {
+    throw new Error("Nachricht ist erforderlich.");
+  }
+
+  if (!input.sendEmail && !input.sendAccountMessage) {
+    throw new Error("Mindestens ein Versandkanal muss ausgewählt sein.");
+  }
+
+  const recipients = await listBetaBroadcastRecipients(input.audience);
+  const accountTitle = subject;
+  const accountBody = message;
+  const accountLink = "/mein-bereich/betatest";
+
+  let emailQueued = 0;
+  let accountMessagesCreated = 0;
+  let skippedNoAccount = 0;
+
+  for (const recipient of recipients) {
+    if (input.sendEmail) {
+      const greeting = formatBroadcastGreeting(recipient.firstName);
+      const greetingText = formatBroadcastGreetingText(recipient.firstName);
+      const messageHtml = escapeHtml(message).replaceAll("\n", "<br>");
+      const htmlBody = `<p>${greeting}</p><p>${messageHtml}</p><p style="color:#9ca3af;font-size:14px;">— Das Team von Alles Wurst</p>`;
+      const textBody = `${greetingText}\n\n${message}\n\n— Das Team von Alles Wurst\n`;
+
+      try {
+        await sendPlatformEmail({
+          category: "SYSTEM",
+          recipientEmail: recipient.email,
+          recipientUserId: recipient.userId ?? undefined,
+          subject,
+          html: wrapPlatformEmailHtml({
+            content: htmlBody,
+            automatedNotice: false,
+          }),
+          text: textBody,
+          priority: "NORMAL",
+          requestedByUserId: input.requestedByUserId,
+          relatedEntity: { type: "beta_broadcast", id: input.requestedByUserId },
+          ...(input.sendAccountMessage && recipient.userId
+            ? {
+                accountMessage: {
+                  type: "beta_broadcast",
+                  title: accountTitle,
+                  body: accountBody,
+                  linkUrl: accountLink,
+                },
+              }
+            : {}),
+        });
+        emailQueued += 1;
+
+        if (input.sendAccountMessage) {
+          if (recipient.userId) {
+            accountMessagesCreated += 1;
+          } else {
+            skippedNoAccount += 1;
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === "SUPPRESSED") {
+          continue;
+        }
+
+        throw error;
+      }
+    } else if (input.sendAccountMessage) {
+      if (!recipient.userId) {
+        skippedNoAccount += 1;
+        continue;
+      }
+
+      await createUserAccountMessage({
+        userId: recipient.userId,
+        messageType: "beta_broadcast",
+        title: accountTitle,
+        body: accountBody,
+        linkUrl: accountLink,
+      });
+      accountMessagesCreated += 1;
+    }
+  }
+
+  return {
+    recipientCount: recipients.length,
+    emailQueued,
+    accountMessagesCreated,
+    skippedNoAccount,
   };
 }
 

@@ -5,12 +5,17 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   addBetaInviteTasksApi,
+  countBetaBroadcastRecipientsApi,
   createBetaInviteApi,
   listBetaInvitesApi,
   resendBetaInviteApi,
   revokeBetaInviteApi,
+  sendBetaBroadcastApi,
 } from "@/lib/beta-test/beta-test-client";
-import type { BetaInviteListItem } from "@/lib/beta-test/beta-test-service";
+import type {
+  BetaBroadcastAudience,
+  BetaInviteListItem,
+} from "@/lib/beta-test/beta-test-service";
 import {
   inputClassName,
   labelClassName,
@@ -63,6 +68,17 @@ export default function AdminBetaTestPanel() {
   const [extraTaskTitle, setExtraTaskTitle] = useState("");
   const [extraTaskDescription, setExtraTaskDescription] = useState("");
 
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastAudience, setBroadcastAudience] =
+    useState<BetaBroadcastAudience>("accepted");
+  const [broadcastSendEmail, setBroadcastSendEmail] = useState(true);
+  const [broadcastSendAccountMessage, setBroadcastSendAccountMessage] = useState(true);
+  const [broadcastRecipientCount, setBroadcastRecipientCount] = useState<number | null>(
+    null,
+  );
+  const [broadcastSending, setBroadcastSending] = useState(false);
+
   const loadInvites = useCallback(async () => {
     setLoading(true);
     const response = await listBetaInvitesApi();
@@ -80,6 +96,18 @@ export default function AdminBetaTestPanel() {
   useEffect(() => {
     void loadInvites();
   }, [loadInvites]);
+
+  const loadBroadcastRecipientCount = useCallback(async () => {
+    const response = await countBetaBroadcastRecipientsApi(broadcastAudience);
+
+    if (response.success) {
+      setBroadcastRecipientCount(response.data.recipientCount);
+    }
+  }, [broadcastAudience]);
+
+  useEffect(() => {
+    void loadBroadcastRecipientCount();
+  }, [loadBroadcastRecipientCount]);
 
   function updateTask(id: string, patch: Partial<TaskDraft>) {
     setTasks((current) =>
@@ -186,8 +214,89 @@ export default function AdminBetaTestPanel() {
     await loadInvites();
   }
 
+  async function handleBroadcastSubmit() {
+    if (!broadcastSubject.trim() || !broadcastMessage.trim()) {
+      setError("Bitte Betreff und Nachricht ausfüllen.");
+      return;
+    }
+
+    if (!broadcastSendEmail && !broadcastSendAccountMessage) {
+      setError("Mindestens ein Versandkanal muss ausgewählt sein.");
+      return;
+    }
+
+    const recipientLabel =
+      broadcastRecipientCount === null
+        ? "die ausgewählten Tester"
+        : `${broadcastRecipientCount} Tester`;
+
+    const audienceLabel =
+      broadcastAudience === "accepted"
+        ? "alle angenommenen Einladungen"
+        : "alle eingeladenen Tester (gesendet oder angenommen)";
+
+    const channelParts: string[] = [];
+
+    if (broadcastSendEmail) {
+      channelParts.push("E-Mail");
+    }
+
+    if (broadcastSendAccountMessage) {
+      channelParts.push("Nachricht in Mein Bereich");
+    }
+
+    const confirmed = window.confirm(
+      `Nachricht wirklich an ${recipientLabel} senden?\n\nZielgruppe: ${audienceLabel}\nKanäle: ${channelParts.join(" + ")}`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBroadcastSending(true);
+    setError(null);
+    setSuccess(null);
+
+    const response = await sendBetaBroadcastApi({
+      subject: broadcastSubject.trim(),
+      message: broadcastMessage.trim(),
+      audience: broadcastAudience,
+      sendEmail: broadcastSendEmail,
+      sendAccountMessage: broadcastSendAccountMessage,
+    });
+
+    setBroadcastSending(false);
+
+    if (!response.success) {
+      setError(response.error.message);
+      return;
+    }
+
+    const result = response.data;
+    const parts = [`${result.recipientCount} Empfänger`];
+
+    if (broadcastSendEmail) {
+      parts.push(`${result.emailQueued} E-Mails in Warteschlange`);
+    }
+
+    if (broadcastSendAccountMessage) {
+      parts.push(`${result.accountMessagesCreated} Account-Nachrichten`);
+    }
+
+    if (result.skippedNoAccount > 0) {
+      parts.push(
+        `${result.skippedNoAccount} ohne Konto (nur E-Mail, falls gewählt)`,
+      );
+    }
+
+    setSuccess(`Sammelnachricht versendet: ${parts.join(" · ")}`);
+    setBroadcastSubject("");
+    setBroadcastMessage("");
+  }
+
 
   return (
+    <div className="space-y-8">
     <div className="grid gap-8 xl:grid-cols-[1.1fr_1fr]">
       <section className="rounded-xl border border-aw-border bg-aw-surface/40 p-6">
         <h2 className="font-display text-lg font-bold text-aw-cream">
@@ -431,6 +540,131 @@ export default function AdminBetaTestPanel() {
           </ul>
         </div>
       </section>
+    </div>
+
+    <section className="rounded-xl border border-aw-gold/30 bg-aw-gold/5 p-6">
+      <h2 className="font-display text-lg font-bold text-aw-cream">
+        Nachricht an alle Tester
+      </h2>
+      <p className="mt-2 text-sm text-aw-muted">
+        Sende ein Dankeschön oder eine Info gesammelt an deine Betatest-Empfänger —
+        per E-Mail, als Nachricht in „Mein Bereich“ oder beides.
+      </p>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
+          <div>
+            <label className={labelClassName} htmlFor="broadcast-audience">
+              Zielgruppe
+            </label>
+            <select
+              id="broadcast-audience"
+              className={`${inputClassName} mt-1 w-full`}
+              value={broadcastAudience}
+              onChange={(event) =>
+                setBroadcastAudience(event.target.value as BetaBroadcastAudience)
+              }
+            >
+              <option value="accepted">Nur angenommene Einladungen</option>
+              <option value="invited">Alle eingeladenen (gesendet oder angenommen)</option>
+            </select>
+            <p className="mt-1 text-xs text-aw-muted">
+              {broadcastRecipientCount === null
+                ? "Empfänger werden gezählt …"
+                : `${broadcastRecipientCount} Empfänger für diese Zielgruppe`}
+            </p>
+          </div>
+
+          <div>
+            <label className={labelClassName} htmlFor="broadcast-subject">
+              Betreff
+            </label>
+            <input
+              id="broadcast-subject"
+              className={`${inputClassName} mt-1 w-full`}
+              value={broadcastSubject}
+              onChange={(event) => setBroadcastSubject(event.target.value)}
+              placeholder="z. B. Danke für euren Betatest!"
+            />
+          </div>
+
+          <div>
+            <label className={labelClassName} htmlFor="broadcast-message">
+              Nachricht
+            </label>
+            <textarea
+              id="broadcast-message"
+              className={`${inputClassName} mt-1 min-h-40 w-full`}
+              value={broadcastMessage}
+              onChange={(event) => setBroadcastMessage(event.target.value)}
+              placeholder="Dein Dankeschön an die Tester …"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <fieldset className="space-y-3 rounded-lg border border-aw-border/70 bg-aw-bg/30 p-4">
+            <legend className={labelClassName}>Versandkanäle</legend>
+            <label className="flex items-start gap-3 text-sm text-aw-cream">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={broadcastSendEmail}
+                onChange={(event) => setBroadcastSendEmail(event.target.checked)}
+              />
+              <span>
+                <strong>E-Mail</strong>
+                <span className="mt-1 block text-aw-muted">
+                  Erreicht alle Empfänger — auch ohne Konto auf der Plattform.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-aw-cream">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={broadcastSendAccountMessage}
+                onChange={(event) =>
+                  setBroadcastSendAccountMessage(event.target.checked)
+                }
+              />
+              <span>
+                <strong>Nachricht in „Mein Bereich“</strong>
+                <span className="mt-1 block text-aw-muted">
+                  Nur für Tester mit Konto. Erscheint unter Datenschutz & Nachrichten.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+
+          <div className="rounded-lg border border-aw-border/70 bg-aw-bg/30 p-4 text-sm text-aw-muted">
+            <p className="font-medium text-aw-cream">Hinweise zum Versand</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>E-Mails werden über die Warteschlange versendet (nicht sofort).</li>
+              <li>Die Anrede nutzt den Vornamen, falls ein Konto vorhanden ist.</li>
+              <li>Pro E-Mail-Adresse wird nur einmal gesendet.</li>
+            </ul>
+          </div>
+
+          <button
+            type="button"
+            className={primaryButtonClassName}
+            disabled={
+              broadcastSending ||
+              !broadcastSubject.trim() ||
+              !broadcastMessage.trim() ||
+              (!broadcastSendEmail && !broadcastSendAccountMessage) ||
+              broadcastRecipientCount === 0
+            }
+            onClick={() => void handleBroadcastSubmit()}
+          >
+            {broadcastSending
+              ? "Sendet …"
+              : `Sammelnachricht senden${broadcastRecipientCount !== null ? ` (${broadcastRecipientCount})` : ""}`}
+          </button>
+        </div>
+      </div>
+    </section>
     </div>
   );
 }

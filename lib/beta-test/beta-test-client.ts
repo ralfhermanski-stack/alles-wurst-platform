@@ -4,6 +4,8 @@
 
 import { adminFetch, type AdminApiResponse } from "@/lib/admin/admin-fetch";
 import type {
+  BetaBroadcastAudience,
+  BetaBroadcastResult,
   BetaInviteDetail,
   BetaInviteListItem,
   BetaTesterTaskItem,
@@ -117,4 +119,25 @@ export async function updateMyBetaTaskApi(input: {
     body: JSON.stringify(input),
   });
   return response.json();
+}
+
+export async function countBetaBroadcastRecipientsApi(
+  audience: BetaBroadcastAudience,
+): Promise<AdminApiResponse<{ audience: BetaBroadcastAudience; recipientCount: number }>> {
+  return adminFetch<{ audience: BetaBroadcastAudience; recipientCount: number }>(
+    `/api/admin/beta-test/broadcast?audience=${encodeURIComponent(audience)}`,
+  );
+}
+
+export async function sendBetaBroadcastApi(input: {
+  subject: string;
+  message: string;
+  audience: BetaBroadcastAudience;
+  sendEmail: boolean;
+  sendAccountMessage: boolean;
+}): Promise<AdminApiResponse<BetaBroadcastResult>> {
+  return adminFetch<BetaBroadcastResult>("/api/admin/beta-test/broadcast", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
