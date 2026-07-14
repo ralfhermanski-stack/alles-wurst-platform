@@ -28,6 +28,54 @@ export function getBlogPostUrl(slug: string): string {
   return `${getBlogSiteUrl()}/magazin/${slug}`;
 }
 
+function isInternalArticleUrl(url: string): boolean {
+  const trimmed = url.trim();
+
+  if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("mailto:") || trimmed.startsWith("tel:")) {
+    return false;
+  }
+
+  if (trimmed.startsWith("/")) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const siteHost = new URL(getBlogSiteUrl()).host;
+
+    return parsed.host === siteHost || parsed.host === "localhost" || parsed.host === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+function hasInternalLinks(
+  body: string,
+  internalLinks: { label: string; url: string }[],
+): boolean {
+  const structuredLinks = internalLinks.filter(
+    (link) => link.label.trim() && link.url.trim() && isInternalArticleUrl(link.url),
+  );
+
+  if (structuredLinks.length > 0) {
+    return true;
+  }
+
+  for (const match of body.matchAll(/<a[^>]+href=["']([^"']+)["']/gi)) {
+    if (isInternalArticleUrl(match[1] ?? "")) {
+      return true;
+    }
+  }
+
+  for (const match of body.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
+    if (isInternalArticleUrl(match[2] ?? "")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function calculateReadingTimeMinutes(body: string): number {
   const words = countWordsInBody(body);
   return Math.max(1, Math.ceil(words / 200));
@@ -200,11 +248,12 @@ export function runBlogQualityCheck(
     });
   }
 
-  if (post.internalLinks.length < 1) {
+  if (!hasInternalLinks(post.body, post.internalLinks)) {
     issues.push({
       code: "internal_links_missing",
-      severity: "error",
-      message: "Mindestens eine interne Verlinkung ist erforderlich.",
+      severity: "warning",
+      message:
+        "Interne Verlinkung wird empfohlen — Link im Artikeltext oder im Tab „Links“ (blockiert die Veröffentlichung nicht).",
     });
   }
 
