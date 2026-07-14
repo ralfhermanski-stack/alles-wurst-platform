@@ -23,6 +23,30 @@ export function isAllowedProductImageMimeType(mimeType: string): boolean {
   return ALLOWED_MIME_TYPES.has(mimeType);
 }
 
+export function inferProductImageMimeType(fileName: string, mimeType: string): string {
+  const normalized = mimeType.trim().toLowerCase();
+
+  if (normalized && isAllowedProductImageMimeType(normalized)) {
+    return normalized;
+  }
+
+  const lowerName = fileName.toLowerCase();
+
+  if (lowerName.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  if (lowerName.endsWith(".png")) {
+    return "image/png";
+  }
+
+  if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+
+  throw new Error("Nur JPEG, PNG oder WebP sind erlaubt.");
+}
+
 function extensionForMimeType(mimeType: string): string {
   if (mimeType === "image/webp") return ".webp";
   if (mimeType === "image/png") return ".png";

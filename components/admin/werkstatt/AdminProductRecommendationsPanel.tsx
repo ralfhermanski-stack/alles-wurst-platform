@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { adminFetch } from "@/lib/admin/admin-fetch";
 import type {
@@ -36,6 +36,13 @@ export default function AdminProductRecommendationsPanel() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [galleryImageUrls, setGalleryImageUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [pendingMainFile, setPendingMainFile] = useState<File | null>(null);
+  const [pendingMainPreview, setPendingMainPreview] = useState<string | null>(null);
+  const [pendingGalleryFiles, setPendingGalleryFiles] = useState<File[]>([]);
+  const mainImageInputId = useId();
+  const galleryImageInputId = useId();
+  const mainImageInputRef = useRef<HTMLInputElement>(null);
+  const galleryImageInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<UpsertProductRecommendationInput>({
     title: "",
     shortDescription: "",
@@ -77,6 +84,37 @@ export default function AdminProductRecommendationsPanel() {
     void reload();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (pendingMainPreview) {
+        URL.revokeObjectURL(pendingMainPreview);
+      }
+    };
+  }, [pendingMainPreview]);
+
+  function clearPendingMainImage(): void {
+    if (pendingMainPreview) {
+      URL.revokeObjectURL(pendingMainPreview);
+    }
+
+    setPendingMainFile(null);
+    setPendingMainPreview(null);
+  }
+
+  function resetEditor(): void {
+    clearPendingMainImage();
+    setPendingGalleryFiles([]);
+    setEditingId(null);
+    setImageUrl(null);
+    setGalleryImageUrls([]);
+    setForm({
+      title: "",
+      shortDescription: "",
+      categoryId: categories[0]?.id ?? "",
+      status: "draft",
+    });
+  }
+
   async function handleSave() {
     setError(null);
 
@@ -108,25 +146,39 @@ export default function AdminProductRecommendationsPanel() {
       setEditingId(savedId);
       setImageUrl(response.data.imageUrl);
       setGalleryImageUrls(response.data.galleryImageUrls ?? []);
+
+      if (pendingMainFile) {
+        const uploaded = await uploadProductImage(pendingMainFile, "main", savedId);
+        if (uploaded) {
+          clearPendingMainImage();
+        }
+      }
+
+      const remainingGalleryFiles: File[] = [];
+
+      for (const file of pendingGalleryFiles) {
+        const uploaded = await uploadProductImage(file, "gallery", savedId);
+        if (!uploaded) {
+          remainingGalleryFiles.push(file);
+        }
+      }
+
+      setPendingGalleryFiles(remainingGalleryFiles);
     } else {
-      setEditingId(null);
-      setImageUrl(null);
-      setGalleryImageUrls([]);
-      setForm({
-        title: "",
-        shortDescription: "",
-        categoryId: categories[0]?.id ?? "",
-        status: "draft",
-      });
+      resetEditor();
     }
 
     await reload();
   }
 
-  async function uploadProductImage(file: File, kind: "main" | "gallery") {
-    if (!editingId) {
+  async function uploadProductImage(
+    file: File,
+    kind: "main" | "gallery",
+    productId = editingId,
+  ): Promise<boolean> {
+    if (!productId) {
       setError("Bitte speichere das Produkt zuerst, bevor du ein Bild hochlädst.");
-      return;
+      return false;
     }
 
     setUploading(true);
@@ -137,7 +189,7 @@ export default function AdminProductRecommendationsPanel() {
     formData.set("kind", kind);
 
     const response = await adminFetch<{ storageKey: string; imageId?: string }>(
-      `/api/admin/werkstatt/produktempfehlungen/${editingId}/image`,
+      `/api/admin/werkstatt/produktempfehlungen/${productId}/image`,
       { method: "POST", body: formData },
     );
 
@@ -145,16 +197,30 @@ export default function AdminProductRecommendationsPanel() {
 
     if (!response.success) {
       setError(response.error.message);
-      return;
+      return false;
     }
 
-    await handleEdit(editingId);
+    await handleEdit(productId);
     await reload();
+    return true;
+  }
+
+  function queueMainImage(file: File): void {
+    clearPendingMainImage();
+    setPendingMainFile(file);
+    setPendingMainPreview(URL.createObjectURL(file));
   }
 
   async function handleMainImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!editingId) {
+      queueMainImage(file);
+      event.target.value = "";
+      return;
+    }
+
     await uploadProductImage(file, "main");
     event.target.value = "";
   }
@@ -162,6 +228,13 @@ export default function AdminProductRecommendationsPanel() {
   async function handleGalleryImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!editingId) {
+      setPendingGalleryFiles((prev) => [...prev, file]);
+      event.target.value = "";
+      return;
+    }
+
     await uploadProductImage(file, "gallery");
     event.target.value = "";
   }
@@ -177,6 +250,8 @@ export default function AdminProductRecommendationsPanel() {
     }
 
     const data = response.data;
+    clearPendingMainImage();
+    setPendingGalleryFiles([]);
     setEditingId(id);
     setImageUrl(data.imageUrl);
     setGalleryImageUrls(data.galleryImageUrls ?? []);
@@ -374,71 +449,112 @@ export default function AdminProductRecommendationsPanel() {
             )}
           </div>
 
-          {editingId ? (
-            <div className="md:col-span-2 rounded-xl border border-aw-border/60 bg-aw-surface-2 p-4">
-              <h3 className="font-semibold text-aw-cream">Produktbilder</h3>
-              <p className="mt-1 text-xs text-aw-muted">
-                JPEG, PNG oder WebP — maximal 5 MB pro Bild.
-              </p>
+          <div className="md:col-span-2 rounded-xl border border-aw-border/60 bg-aw-surface-2 p-4">
+            <h3 className="font-semibold text-aw-cream">Produktbilder</h3>
+            <p className="mt-1 text-xs text-aw-muted">
+              JPEG, PNG oder WebP — maximal 5 MB pro Bild.
+              {!editingId && " Beim ersten Speichern werden ausgewählte Bilder automatisch hochgeladen."}
+            </p>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className={labelClassName}>Hauptbild</label>
-                  {imageUrl ? (
-                    <div className="relative mt-2 aspect-[4/3] overflow-hidden rounded-lg border border-aw-border">
-                      <Image
-                        src={imageUrl}
-                        alt="Produktbild"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-aw-muted">
-                      Noch kein Bild — es wird das Kategorie-Standardbild verwendet.
-                    </p>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="mt-3 block w-full text-sm text-aw-muted"
-                    disabled={uploading}
-                    onChange={(event) => void handleMainImageUpload(event)}
-                  />
-                </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <label className={labelClassName}>Hauptbild</label>
+                {imageUrl || pendingMainPreview ? (
+                  <div className="relative mt-2 aspect-[4/3] overflow-hidden rounded-lg border border-aw-border">
+                    <Image
+                      src={pendingMainPreview ?? imageUrl ?? ""}
+                      alt="Produktbild"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-aw-muted">
+                    Noch kein Bild — es wird das Kategorie-Standardbild verwendet.
+                  </p>
+                )}
 
-                <div>
-                  <label className={labelClassName}>Galeriebilder</label>
-                  {galleryImageUrls.length > 0 ? (
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {galleryImageUrls.map((url) => (
-                        <div
-                          key={url}
-                          className="relative aspect-square overflow-hidden rounded-lg border border-aw-border"
-                        >
-                          <Image src={url} alt="" fill className="object-cover" unoptimized />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-aw-muted">Noch keine Galeriebilder.</p>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="mt-3 block w-full text-sm text-aw-muted"
+                <input
+                  id={mainImageInputId}
+                  ref={mainImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={(event) => void handleMainImageUpload(event)}
+                />
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={imageUrl || pendingMainPreview ? secondaryButtonClassName : primaryButtonClassName}
                     disabled={uploading}
-                    onChange={(event) => void handleGalleryImageUpload(event)}
-                  />
+                    onClick={() => mainImageInputRef.current?.click()}
+                  >
+                    {uploading
+                      ? "Wird hochgeladen …"
+                      : imageUrl || pendingMainPreview
+                        ? "Hauptbild ersetzen"
+                        : "Hauptbild wählen"}
+                  </button>
+
+                  {pendingMainPreview && !editingId && (
+                    <button
+                      type="button"
+                      className={secondaryButtonClassName}
+                      onClick={clearPendingMainImage}
+                    >
+                      Auswahl entfernen
+                    </button>
+                  )}
                 </div>
               </div>
+
+              <div>
+                <label className={labelClassName}>Galeriebilder</label>
+                {galleryImageUrls.length > 0 ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {galleryImageUrls.map((url) => (
+                      <div
+                        key={url}
+                        className="relative aspect-square overflow-hidden rounded-lg border border-aw-border"
+                      >
+                        <Image src={url} alt="" fill className="object-cover" unoptimized />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-aw-muted">Noch keine Galeriebilder.</p>
+                )}
+
+                {pendingGalleryFiles.length > 0 && (
+                  <p className="mt-2 text-xs text-aw-gold">
+                    {pendingGalleryFiles.length} Galeriebild(er) werden beim Speichern hochgeladen.
+                  </p>
+                )}
+
+                <input
+                  id={galleryImageInputId}
+                  ref={galleryImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={(event) => void handleGalleryImageUpload(event)}
+                />
+
+                <button
+                  type="button"
+                  className={`${secondaryButtonClassName} mt-3`}
+                  disabled={uploading}
+                  onClick={() => galleryImageInputRef.current?.click()}
+                >
+                  Galeriebild hinzufügen
+                </button>
+              </div>
             </div>
-          ) : (
-            <p className="md:col-span-2 text-sm text-aw-muted">
-              Bilder können hochgeladen werden, sobald das Produkt gespeichert wurde.
-            </p>
-          )}
+          </div>
         </div>
 
         <div className="mt-4 flex gap-2">
@@ -449,17 +565,7 @@ export default function AdminProductRecommendationsPanel() {
             <button
               type="button"
               className={secondaryButtonClassName}
-              onClick={() => {
-                setEditingId(null);
-                setImageUrl(null);
-                setGalleryImageUrls([]);
-                setForm({
-                  title: "",
-                  shortDescription: "",
-                  categoryId: categories[0]?.id ?? "",
-                  status: "draft",
-                });
-              }}
+              onClick={resetEditor}
             >
               Abbrechen
             </button>

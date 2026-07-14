@@ -57,5 +57,8 @@ next-env.d.ts
 # Rezeptbilder
 /storage/recipe-images/
 
+# Produktempfehlungs-Bilder
+/storage/product-recommendations/
+
 # Datenschutz-Exporte (Nutzerdaten)
 /storage/data-exports/

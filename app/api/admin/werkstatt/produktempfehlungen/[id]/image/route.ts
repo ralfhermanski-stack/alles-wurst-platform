@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { adminGuardResponse } from "@/lib/admin/admin-api-utils";
-import { saveProductRecommendationImage } from "@/lib/product-recommendations/product-recommendation-image-storage";
+import { saveProductRecommendationImage, inferProductImageMimeType } from "@/lib/product-recommendations/product-recommendation-image-storage";
 import { prisma } from "@/lib/db/prisma";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -40,10 +40,11 @@ export async function POST(
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
+    const resolvedMimeType = inferProductImageMimeType(file.name, file.type || "");
     const saved = await saveProductRecommendationImage(
       id,
       file.name,
-      file.type || "image/jpeg",
+      resolvedMimeType,
       bytes,
       kind,
     );
