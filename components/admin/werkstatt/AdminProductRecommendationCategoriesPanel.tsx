@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { adminFetch } from "@/lib/admin/admin-fetch";
@@ -43,11 +42,14 @@ export default function AdminProductRecommendationCategoriesPanel({
   const [uploadingCategoryId, setUploadingCategoryId] = useState<string | null>(null);
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null);
   const [imageVersions, setImageVersions] = useState<Record<string, number>>({});
+  const [pendingPreviews, setPendingPreviews] = useState<Record<string, string>>({});
+  const [imageLoadErrors, setImageLoadErrors] = useState<Record<string, boolean>>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, CategoryDraft>>({});
   const [newCategory, setNewCategory] = useState<CategoryDraft>(emptyDraft);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const pendingPreviewUrlsRef = useRef<Set<string>>(new Set());
   const newCategoryInputId = useId();
 
   async function reload() {
@@ -82,6 +84,31 @@ export default function AdminProductRecommendationCategoriesPanel({
   useEffect(() => {
     void reload();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const previewUrl of pendingPreviewUrlsRef.current) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
+      pendingPreviewUrlsRef.current.clear();
+    };
+  }, []);
+
+  function clearPendingPreview(categoryId: string) {
+    setPendingPreviews((current) => {
+      const previewUrl = current[categoryId];
+
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        pendingPreviewUrlsRef.current.delete(previewUrl);
+      }
+
+      const next = { ...current };
+      delete next[categoryId];
+      return next;
+    });
+  }
 
   function updateDraft(categoryId: string, patch: Partial<CategoryDraft>) {
     setDrafts((current) => ({
@@ -162,23 +189,34 @@ export default function AdminProductRecommendationCategoriesPanel({
   async function handleUploadPlaceholder(categoryId: string, file: File) {
     setUploadingCategoryId(categoryId);
     setError(null);
+    setImageLoadErrors((current) => ({ ...current, [categoryId]: false }));
+
+    clearPendingPreview(categoryId);
+    const localPreviewUrl = URL.createObjectURL(file);
+    pendingPreviewUrlsRef.current.add(localPreviewUrl);
+    setPendingPreviews((current) => ({
+      ...current,
+      [categoryId]: localPreviewUrl,
+    }));
 
     const formData = new FormData();
     formData.set("categoryId", categoryId);
     formData.set("file", file);
 
     const response = await adminFetch<{ storageKey: string }>(
-      "/api/admin/werkstatt/produktempfehlungen/categories",
-      { method: "PUT", body: formData },
+      "/api/admin/werkstatt/produktempfehlungen/categories/placeholder",
+      { method: "POST", body: formData },
     );
 
     setUploadingCategoryId(null);
 
     if (!response.success) {
+      clearPendingPreview(categoryId);
       setError(response.error.message);
       return;
     }
 
+    clearPendingPreview(categoryId);
     setImageVersions((current) => ({
       ...current,
       [categoryId]: (current[categoryId] ?? 0) + 1,
@@ -223,6 +261,12 @@ export default function AdminProductRecommendationCategoriesPanel({
 
   return (
     <div className="space-y-6">
+      {error && (
+        <p className="rounded-lg border border-aw-warning/40 bg-aw-warning/10 px-4 py-3 text-sm text-aw-warning" role="alert">
+          {error}
+        </p>
+      )}
+
       <div className="rounded-xl border border-aw-border bg-aw-surface-2/40 p-4">
         <h2 className="font-semibold text-aw-cream">Kategorie-Standardbilder</h2>
         <p className="mt-1 text-sm text-aw-muted">
@@ -237,9 +281,11 @@ export default function AdminProductRecommendationCategoriesPanel({
           const isEditing = editingCategoryId === category.id;
           const isBusy =
             uploadingCategoryId === category.id || savingCategoryId === category.id;
-          const previewUrl = category.placeholderImageUrl
-            ? `${category.placeholderImageUrl}?v=${imageVersions[category.id] ?? 0}`
-            : null;
+          const previewUrl = pendingPreviews[category.id]
+            ?? (category.placeholderImageUrl
+              ? `${category.placeholderImageUrl}?v=${imageVersions[category.id] ?? 0}`
+              : null);
+          const previewFailed = imageLoadErrors[category.id];
 
           return (
             <article
@@ -247,17 +293,25 @@ export default function AdminProductRecommendationCategoriesPanel({
               className="flex flex-col overflow-hidden rounded-xl border border-aw-border bg-aw-surface"
             >
               <div className="relative aspect-[4/3] bg-aw-surface-2">
-                {previewUrl ? (
-                  <Image
+                {previewUrl && !previewFailed ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
                     src={previewUrl}
                     alt={`Standardbild ${category.name}`}
-                    fill
-                    className="object-cover"
-                    unoptimized
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={() => {
+                      setImageLoadErrors((current) => ({
+                        ...current,
+                        [category.id]: true,
+                      }));
+                      setError(
+                        `Vorschaubild für „${category.name}“ konnte nicht geladen werden.`,
+                      );
+                    }}
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-aw-muted">
-                    Kein Vorschaubild
+                  <div className="flex h-full items-center justify-center px-4 text-center text-sm text-aw-muted">
+                    {previewFailed ? "Vorschaubild konnte nicht geladen werden" : "Kein Vorschaubild"}
                   </div>
                 )}
                 <span
@@ -473,12 +527,6 @@ export default function AdminProductRecommendationCategoriesPanel({
           {creatingCategory ? "Wird angelegt …" : "Kategorie anlegen"}
         </button>
       </section>
-
-      {error && (
-        <p className="text-sm text-aw-warning" role="alert">
-          {error}
-        </p>
-      )}
     </div>
   );
 }
