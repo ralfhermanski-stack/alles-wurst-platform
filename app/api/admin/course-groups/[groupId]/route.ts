@@ -34,6 +34,7 @@ export async function PATCH(
     name: getStringField(body, "name") ?? undefined,
     slug: getStringField(body, "slug") ?? undefined,
     shortDescription: getNullableStringField(body, "shortDescription"),
+    levelLabel: getNullableStringField(body, "levelLabel"),
     sortOrder:
       typeof body.sortOrder === "number" ? body.sortOrder : undefined,
     isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,

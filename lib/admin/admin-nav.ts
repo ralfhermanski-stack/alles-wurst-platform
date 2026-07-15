@@ -130,7 +130,7 @@ export const adminNavSections: AdminNavSection[] = [
     label: "Kurse",
     items: [
       { label: "Kursübersicht", href: "/admin/kurse" },
-      { label: "Kursgruppen", href: "/admin/kurse/gruppen" },
+      { label: "Lernpfade", href: "/admin/kurse/gruppen" },
       { label: "Bewertungen", href: "/admin/bewertungen" },
       { label: "Zertifikate", href: "/admin/zertifikate" },
     ],

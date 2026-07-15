@@ -31,12 +31,18 @@ type GroupDraft = {
   name: string;
   slug: string;
   shortDescription: string;
+  levelLabel: string;
   sortOrder: number;
   isActive: boolean;
 };
 
-type SubgroupDraft = GroupDraft & {
+type SubgroupDraft = {
   courseGroupId: string;
+  name: string;
+  slug: string;
+  shortDescription: string;
+  sortOrder: number;
+  isActive: boolean;
 };
 
 function emptyGroupDraft(): GroupDraft {
@@ -44,6 +50,7 @@ function emptyGroupDraft(): GroupDraft {
     name: "",
     slug: "",
     shortDescription: "",
+    levelLabel: "",
     sortOrder: 100,
     isActive: true,
   };
@@ -54,6 +61,7 @@ function groupToDraft(group: CourseGroupRecord): GroupDraft {
     name: group.name,
     slug: group.slug,
     shortDescription: group.shortDescription ?? "",
+    levelLabel: group.levelLabel ?? "",
     sortOrder: group.sortOrder,
     isActive: group.isActive,
   };
@@ -173,6 +181,7 @@ export default function AdminCourseGroupManager() {
       name: newGroup.name.trim(),
       slug: newGroup.slug.trim() || undefined,
       shortDescription: newGroup.shortDescription.trim() || null,
+      levelLabel: newGroup.levelLabel.trim() || null,
       sortOrder: newGroup.sortOrder,
       isActive: newGroup.isActive,
     });
@@ -192,6 +201,7 @@ export default function AdminCourseGroupManager() {
       name: groupDraft.name.trim(),
       slug: groupDraft.slug.trim() || undefined,
       shortDescription: groupDraft.shortDescription.trim() || null,
+      levelLabel: groupDraft.levelLabel.trim() || null,
       sortOrder: groupDraft.sortOrder,
       isActive: groupDraft.isActive,
     });
@@ -218,7 +228,7 @@ export default function AdminCourseGroupManager() {
       return;
     }
 
-    if (!window.confirm(`Hauptgruppe „${group.name}" wirklich löschen?`)) {
+    if (!window.confirm(`Lernpfad „${group.name}" wirklich löschen?`)) {
       return;
     }
 
@@ -311,7 +321,7 @@ export default function AdminCourseGroupManager() {
       return;
     }
 
-    if (!window.confirm(`Untergruppe „${subgroup.name}" wirklich löschen?`)) {
+    if (!window.confirm(`Modul „${subgroup.name}" wirklich löschen?`)) {
       return;
     }
 
@@ -422,14 +432,16 @@ export default function AdminCourseGroupManager() {
             <Link href="/admin/kurse" className="hover:text-aw-gold">
               Kurse
             </Link>
-            {" / Gruppen"}
+            {" / Lernpfade"}
           </p>
           <h1 className="mt-1 font-display text-2xl font-bold text-aw-cream">
-            Kursgruppen verwalten
+            Lernpfade verwalten
           </h1>
           <p className="mt-2 text-sm text-aw-muted">
-            Hauptgruppen und Untergruppen für den Kurskatalog. Gruppen mit
-            zugeordneten Kursen können nur deaktiviert, nicht gelöscht werden.
+            Lernpfade erscheinen auf der Akademie-Seite. Pro Pfad kannst du
+            Module anlegen und Kurse zuordnen (beim Kurs unter Gruppe wählen).
+            Pfade mit zugeordneten Kursen können nur deaktiviert, nicht gelöscht
+            werden.
           </p>
         </div>
       </div>
@@ -441,8 +453,8 @@ export default function AdminCourseGroupManager() {
       )}
 
       <section className="rounded-xl border border-aw-border bg-aw-surface/40 p-5">
-        <h2 className="font-semibold text-aw-cream">Neue Hauptgruppe</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="font-semibold text-aw-cream">Neuer Lernpfad</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className={labelClassName} htmlFor="new-group-name">
               Name
@@ -466,6 +478,20 @@ export default function AdminCourseGroupManager() {
               value={newGroup.slug}
               onChange={(e) =>
                 setNewGroup((draft) => ({ ...draft, slug: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor="new-group-level">
+              Level-Badge
+            </label>
+            <input
+              id="new-group-level"
+              className={`${inputClassName} mt-2`}
+              value={newGroup.levelLabel}
+              placeholder="z. B. Einsteiger"
+              onChange={(e) =>
+                setNewGroup((draft) => ({ ...draft, levelLabel: e.target.value }))
               }
             />
           </div>
@@ -515,10 +541,10 @@ export default function AdminCourseGroupManager() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-semibold text-aw-cream">Hauptgruppen</h2>
+        <h2 className="font-semibold text-aw-cream">Lernpfade</h2>
 
         {groups.length === 0 ? (
-          <p className="text-sm text-aw-muted">Noch keine Hauptgruppen angelegt.</p>
+          <p className="text-sm text-aw-muted">Noch keine Lernpfade angelegt.</p>
         ) : (
           groups.map((group, index) => {
             const isEditing = editingGroupId === group.id;
@@ -543,8 +569,9 @@ export default function AdminCourseGroupManager() {
                       {group.name}
                     </h3>
                     <p className="mt-1 text-xs text-aw-muted">
-                      /{group.slug} · {group.subgroupCount} Untergruppen ·{" "}
-                      {group.courseCount} Kurse
+                      /{group.slug}
+                      {group.levelLabel ? ` · ${group.levelLabel}` : ""} ·{" "}
+                      {group.subgroupCount} Module · {group.courseCount} Kurse
                       {!group.isActive && " · inaktiv"}
                     </p>
                   </button>
@@ -627,6 +654,20 @@ export default function AdminCourseGroupManager() {
                       />
                     </div>
                     <div>
+                      <label className={labelClassName}>Level-Badge</label>
+                      <input
+                        className={`${inputClassName} mt-2`}
+                        value={groupDraft.levelLabel}
+                        placeholder="z. B. Fortgeschritten"
+                        onChange={(e) =>
+                          setGroupDraft((draft) => ({
+                            ...draft,
+                            levelLabel: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
                       <label className={labelClassName}>Sortierung</label>
                       <input
                         type="number"
@@ -699,7 +740,7 @@ export default function AdminCourseGroupManager() {
       {selectedGroupId && (
         <section className="rounded-xl border border-aw-border bg-aw-surface/40 p-5">
           <h2 className="font-semibold text-aw-cream">
-            Untergruppen von{' '}
+            Module von{" "}
             {groups.find((g) => g.id === selectedGroupId)?.name ?? "Gruppe"}
           </h2>
 
@@ -744,7 +785,7 @@ export default function AdminCourseGroupManager() {
                 className={primaryButtonClassName}
                 onClick={() => void handleCreateSubgroup()}
               >
-                Untergruppe anlegen
+                Modul anlegen
               </button>
             </div>
           </div>
@@ -752,7 +793,7 @@ export default function AdminCourseGroupManager() {
           <div className="mt-6 space-y-4">
             {visibleSubgroups.length === 0 ? (
               <p className="text-sm text-aw-muted">
-                Noch keine Untergruppen in dieser Hauptgruppe.
+                Noch keine Module in diesem Lernpfad.
               </p>
             ) : (
               visibleSubgroups.map((subgroup, index) => {
@@ -814,7 +855,7 @@ export default function AdminCourseGroupManager() {
 
                     <div className="mt-3">
                       <AdminGroupImageUpload
-                        title="Untergruppenbild"
+                        title="Modulbild"
                         entityName={subgroup.name}
                         imageUrl={`/api/course-subgroups/${subgroup.id}/image?v=${imageVersion}`}
                         imageFileName={subgroup.imageFileName}
@@ -854,7 +895,7 @@ export default function AdminCourseGroupManager() {
                           />
                         </div>
                         <div>
-                          <label className={labelClassName}>Hauptgruppe</label>
+                          <label className={labelClassName}>Lernpfad</label>
                           <select
                             className={`${inputClassName} mt-2`}
                             value={subgroupDraft.courseGroupId}

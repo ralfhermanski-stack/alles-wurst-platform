@@ -1882,6 +1882,8 @@ model CourseGroup {
   name             String
   slug             String @unique
   shortDescription String? @db.Text @map("short_description")
+  /// Anzeige-Badge, z. B. „Einsteiger“, „Fortgeschritten“, „Meister“
+  levelLabel       String? @map("level_label")
   imageStorageKey  String? @map("image_storage_key")
   imageFileName    String? @map("image_file_name")
   sortOrder        Int     @default(0) @map("sort_order")

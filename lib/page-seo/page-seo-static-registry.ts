@@ -36,7 +36,7 @@ const STATIC_PAGES: StaticPageDefinition[] = [
     description:
       "Strukturierte Lernpfade und Kurse für Wurstherstellung, Räuchern und Fleischverarbeitung.",
     bodyText:
-      "Die Alles-Wurst Akademie bietet Lernpfade vom Einsteiger bis zum Fortgeschrittenen: Wurst-Einsteiger, Räucher-Profi und weitere Bereiche.",
+      "Die Alles-Wurst Akademie bietet strukturierte Lernpfade und Kurse für Wurstherstellung, Räuchern und Fleischverarbeitung.",
   },
   {
     path: "/akademie/kurse",

@@ -69,6 +69,7 @@ function mapGroup(
     name: group.name,
     slug: group.slug,
     shortDescription: group.shortDescription,
+    levelLabel: group.levelLabel,
     hasImage: Boolean(group.imageStorageKey),
     imageFileName: group.imageFileName,
     sortOrder: group.sortOrder,
@@ -152,6 +153,11 @@ export async function listPublicCourseGroups(): Promise<PublicCourseGroupCard[]>
         where: { isActive: true },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       },
+      _count: {
+        select: {
+          courses: { where: { status: "published" } },
+        },
+      },
     },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
@@ -161,8 +167,11 @@ export async function listPublicCourseGroups(): Promise<PublicCourseGroupCard[]>
     name: group.name,
     slug: group.slug,
     shortDescription: group.shortDescription,
+    levelLabel: group.levelLabel,
     hasImage: Boolean(group.imageStorageKey),
     sortOrder: group.sortOrder,
+    courseCount: group._count.courses,
+    subgroupCount: group.subgroups.length,
     subgroups: group.subgroups.map((subgroup) => ({
       id: subgroup.id,
       name: subgroup.name,
@@ -312,6 +321,7 @@ export async function createCourseGroup(
         name,
         slug,
         shortDescription: input.shortDescription?.trim() || null,
+        levelLabel: input.levelLabel?.trim() || null,
         sortOrder: input.sortOrder ?? 100,
         isActive: input.isActive ?? true,
       },
@@ -365,6 +375,10 @@ export async function updateCourseGroup(
         shortDescription:
           input.shortDescription !== undefined
             ? input.shortDescription?.trim() || null
+            : undefined,
+        levelLabel:
+          input.levelLabel !== undefined
+            ? input.levelLabel?.trim() || null
             : undefined,
         sortOrder: input.sortOrder,
         isActive: input.isActive,

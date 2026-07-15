@@ -18,6 +18,7 @@ export type CourseSubgroupRef = {
 
 export type CourseGroupRecord = CourseGroupRef & {
   shortDescription: string | null;
+  levelLabel: string | null;
   hasImage: boolean;
   imageFileName: string | null;
   sortOrder: number;
@@ -46,8 +47,11 @@ export type PublicCourseGroupCard = {
   name: string;
   slug: string;
   shortDescription: string | null;
+  levelLabel: string | null;
   hasImage: boolean;
   sortOrder: number;
+  courseCount: number;
+  subgroupCount: number;
   subgroups: Array<{
     id: string;
     name: string;
@@ -62,6 +66,7 @@ export type CreateCourseGroupInput = {
   name: string;
   slug?: string;
   shortDescription?: string | null;
+  levelLabel?: string | null;
   sortOrder?: number;
   isActive?: boolean;
 };

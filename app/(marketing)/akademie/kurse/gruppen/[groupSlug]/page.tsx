@@ -46,7 +46,7 @@ export default async function CourseGroupPage({ params }: GroupPageProps) {
   return (
     <>
       <PageHeader
-        eyebrow="Akademie / Kurse"
+        eyebrow="Akademie / Lernpfad"
         title={group.name}
         description={
           group.shortDescription ??
@@ -66,7 +66,7 @@ export default async function CourseGroupPage({ params }: GroupPageProps) {
         {group.subgroups.length > 0 && (
           <div className="mt-8">
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-aw-gold">
-              Untergruppen
+              Module
             </h2>
             <div className="mt-4 flex flex-wrap gap-2">
               {group.subgroups.map((subgroup) => (

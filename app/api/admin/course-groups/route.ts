@@ -50,6 +50,7 @@ export async function POST(request: Request): Promise<Response> {
     name,
     slug: getStringField(body, "slug") ?? undefined,
     shortDescription: getNullableStringField(body, "shortDescription"),
+    levelLabel: getNullableStringField(body, "levelLabel"),
     sortOrder:
       typeof body.sortOrder === "number" ? body.sortOrder : undefined,
     isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,

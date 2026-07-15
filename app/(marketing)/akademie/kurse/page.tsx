@@ -33,10 +33,10 @@ export default async function KursePage() {
       {groups.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
           <h2 className="font-display text-2xl font-bold text-aw-cream">
-            Kursbereiche
+            Lernpfade
           </h2>
           <p className="mt-2 text-sm text-aw-muted">
-            Nach Themen filtern — wähle eine Hauptgruppe oder Untergruppe.
+            Nach Themen filtern — wähle einen Lernpfad oder ein Modul.
           </p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((group) => (
