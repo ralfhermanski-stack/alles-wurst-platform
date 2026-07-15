@@ -10,6 +10,11 @@ import {
 } from "@/lib/auth/auth-api-utils";
 import { userFailure, userSuccess } from "@/lib/users/user-errors";
 import type { UserProfileInput } from "@/lib/users/user-types";
+import {
+  isProfileBioFilled,
+  normalizeProfileBioInput,
+  validateProfileBio,
+} from "@/lib/users/profile-bio-utils";
 
 function mapPrismaToInput(profile: {
   salutation: string | null;
@@ -17,6 +22,7 @@ function mapPrismaToInput(profile: {
   avatarUrl: string | null;
   avatarFileName: string | null;
   bio: string | null;
+  useBioAsForumSignature: boolean;
   firstName: string;
   lastName: string;
   company: string | null;
@@ -35,6 +41,7 @@ function mapPrismaToInput(profile: {
     avatarUrl: profile.avatarUrl ?? null,
     avatarFileName: profile.avatarFileName ?? null,
     bio: profile.bio ?? null,
+    useBioAsForumSignature: profile.useBioAsForumSignature,
     firstName: profile.firstName,
     lastName: profile.lastName,
     company: profile.company ?? null,
@@ -114,6 +121,7 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const avatarUrlRaw = getNullableStringField(body, "avatarUrl");
   const bioRaw = getNullableStringField(body, "bio");
+  const useBioAsForumSignatureRaw = body.useBioAsForumSignature;
 
   const addressRaw = body.address;
 
@@ -153,7 +161,6 @@ export async function PATCH(request: Request): Promise<Response> {
   }
 
   const PUBLIC_NAME_REGEX = /^[a-zA-Z0-9_]+$/;
-  const MAX_BIO_LENGTH = 300;
 
   const publicName =
     publicNameRaw === undefined
@@ -252,20 +259,59 @@ export async function PATCH(request: Request): Promise<Response> {
     }
   }
 
-  const bio =
-    bioRaw === undefined
-      ? undefined
-      : bioRaw === null
-        ? null
-        : bioRaw.trim();
+  let bio: string | null | undefined;
 
-  if (bio !== undefined && bio !== null && bio.length > MAX_BIO_LENGTH) {
+  try {
+    bio =
+      bioRaw === undefined
+        ? undefined
+        : validateProfileBio(
+            bioRaw === null ? null : normalizeProfileBioInput(bioRaw),
+          );
+  } catch (error) {
     return jsonFromAuthResult(
       userFailure({
         code: "VALIDATION_ERROR",
-        message: `Bio ist zu lang (max. ${MAX_BIO_LENGTH} Zeichen).`,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Profilbeschreibung ist ungültig.",
       }),
     );
+  }
+
+  const useBioAsForumSignature =
+    useBioAsForumSignatureRaw === undefined
+      ? undefined
+      : useBioAsForumSignatureRaw === true;
+
+  if (useBioAsForumSignature === true) {
+    if (bio === null) {
+      return jsonFromAuthResult(
+        userFailure({
+          code: "VALIDATION_ERROR",
+          message:
+            "Für eine Foren-Signatur ist eine Profilbeschreibung erforderlich.",
+        }),
+      );
+    }
+
+    if (bio === undefined) {
+      const existingProfile = await prisma.userProfile.findUnique({
+        where: { userId },
+        select: { bio: true },
+      });
+
+      if (!isProfileBioFilled(existingProfile?.bio)) {
+        return jsonFromAuthResult(
+          userFailure({
+            code: "VALIDATION_ERROR",
+            message:
+              "Für eine Foren-Signatur ist eine Profilbeschreibung erforderlich.",
+          }),
+        );
+      }
+    }
   }
 
   try {
@@ -301,6 +347,14 @@ export async function PATCH(request: Request): Promise<Response> {
 
     if (bio !== undefined) {
       nextData.bio = bio;
+
+      if (bio === null) {
+        nextData.useBioAsForumSignature = false;
+      }
+    }
+
+    if (useBioAsForumSignature !== undefined) {
+      nextData.useBioAsForumSignature = useBioAsForumSignature;
     }
 
     const updated = await prisma.userProfile.update({

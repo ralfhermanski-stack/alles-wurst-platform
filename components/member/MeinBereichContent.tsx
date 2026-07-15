@@ -12,6 +12,7 @@ import { MEMBERSHIP_ROLE_LABELS } from "@/lib/membership/membership-labels";
 import { useAuth } from "@/lib/auth/use-auth";
 
 import type { MyProfileResponse } from "@/lib/users/user-profile-client";
+import { isProfileBioFilled } from "@/lib/users/profile-bio-utils";
 import { fetchMyProfileApi } from "@/lib/users/user-profile-client";
 
 import ProfileEditor from "@/components/member/ProfileEditor";
@@ -44,7 +45,7 @@ function computeProfileCompletion(profile: MyProfileResponse | null): {
     Boolean(profile.firstName?.trim()),
     Boolean(profile.lastName?.trim()),
     Boolean(profile.avatarUrl?.trim()),
-    Boolean(profile.bio?.trim()),
+    isProfileBioFilled(profile.bio),
   ];
 
   const total = required.length;

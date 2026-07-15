@@ -43,6 +43,8 @@ export type UserProfileInput = {
   avatarUrl?: string | null;
   avatarFileName?: string | null;
   bio?: string | null;
+  /** Bio unter Forenbeiträgen als Signatur anzeigen. */
+  useBioAsForumSignature?: boolean;
   firstName: string;
   lastName: string;
   company?: string | null;

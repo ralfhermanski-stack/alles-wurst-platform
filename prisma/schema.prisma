@@ -489,8 +489,11 @@ model UserProfile {
   avatarStorageKey String? @map("avatar_storage_key")
   avatarFileName   String? @map("avatar_file_name")
 
-  /// Kurze öffentliche Profilbeschreibung.
+  /// Kurze öffentliche Profilbeschreibung (Plain-Text oder Rich-Text-HTML).
   bio String? @db.Text
+
+  /// Bio unter eigenen Forenbeiträgen als Signatur anzeigen.
+  useBioAsForumSignature Boolean @default(false) @map("use_bio_as_forum_signature")
 
   firstName String @map("first_name")
   lastName  String @map("last_name")

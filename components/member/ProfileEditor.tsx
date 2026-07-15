@@ -13,6 +13,14 @@ import {
 import type { UserProfileInput } from "@/lib/users/user-types";
 
 import ProfileAvatarUpload from "@/components/member/ProfileAvatarUpload";
+import RichTextField from "@/components/admin/RichTextField";
+
+import {
+  isProfileBioFilled,
+  MAX_PROFILE_BIO_PLAIN_CHARS,
+  normalizeProfileBioInput,
+} from "@/lib/users/profile-bio-utils";
+import { isEmptyRichBody } from "@/lib/content/rich-body-utils";
 
 import {
   inputClassName,
@@ -52,7 +60,8 @@ export default function ProfileEditor({
   const [phone, setPhone] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFileName, setAvatarFileName] = useState<string | null>(null);
-  const [bio, setBio] = useState<string | null>(null);
+  const [bio, setBio] = useState("");
+  const [useBioAsForumSignature, setUseBioAsForumSignature] = useState(false);
 
   const [street, setStreet] = useState("");
   const [houseNumber, setHouseNumber] = useState("");
@@ -107,7 +116,8 @@ export default function ProfileEditor({
       setPhone(p.phone ?? null);
       setAvatarUrl(p.avatarUrl ?? null);
       setAvatarFileName(p.avatarFileName ?? null);
-      setBio(p.bio ?? null);
+      setBio(p.bio ?? "");
+      setUseBioAsForumSignature(Boolean(p.useBioAsForumSignature));
 
       setStreet(p.address.street);
       setHouseNumber(p.address.houseNumber);
@@ -124,6 +134,12 @@ export default function ProfileEditor({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (isEmptyRichBody(bio)) {
+      setUseBioAsForumSignature(false);
+    }
+  }, [bio]);
 
   async function handleSaveProfile() {
     if (!firstName.trim() || !lastName.trim()) {
@@ -160,6 +176,16 @@ export default function ProfileEditor({
       return;
     }
 
+    if (
+      useBioAsForumSignature &&
+      !isProfileBioFilled(normalizeProfileBioInput(bio))
+    ) {
+      setError(
+        "Für eine Foren-Signatur brauchst du zuerst eine Profilbeschreibung.",
+      );
+      return;
+    }
+
     setSavingProfile(true);
     setError(null);
     setSuccess(null);
@@ -172,7 +198,8 @@ export default function ProfileEditor({
       ...(avatarUrl?.startsWith("/api/users/")
         ? {}
         : { avatarUrl: avatarUrl?.trim() ?? null }),
-      bio: bio?.trim() ?? null,
+      bio: normalizeProfileBioInput(bio),
+      useBioAsForumSignature,
       company,
       phone,
       address: {
@@ -384,14 +411,34 @@ export default function ProfileEditor({
           </div>
 
           <div className="sm:col-span-2">
-            <label className={labelClassName}>Bio / Profilbeschreibung (optional)</label>
-            <textarea
-              className={`${inputClassName} mt-2 min-h-24`}
-              value={bio ?? ""}
-              onChange={(e) => setBio(normalizeNullable(e.target.value))}
-              placeholder="Kurz & knackig – max. 300 Zeichen."
-              maxLength={300}
+            <RichTextField
+              id="profile-bio"
+              label="Bio / Profilbeschreibung (optional)"
+              value={bio}
+              onChange={setBio}
+              placeholder="Kurz über dich — Fett, Kursiv, Links und Absätze sind möglich."
+              minHeight="min-h-[160px]"
+              helpText={`Max. ${MAX_PROFILE_BIO_PLAIN_CHARS} Zeichen Text. Wird öffentlich sichtbar, z. B. als Foren-Signatur.`}
             />
+
+            <label className="mt-4 flex items-start gap-3 text-sm text-aw-cream">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={useBioAsForumSignature}
+                disabled={isEmptyRichBody(bio)}
+                onChange={(event) =>
+                  setUseBioAsForumSignature(event.target.checked)
+                }
+              />
+              <span>
+                <strong>Als Signatur unter meine Forenbeiträge setzen</strong>
+                <span className="mt-1 block text-aw-muted">
+                  Zeigt deine Profilbeschreibung unter deinen Beiträgen im Forum
+                  an — getrennt vom eigentlichen Beitragstext.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div>

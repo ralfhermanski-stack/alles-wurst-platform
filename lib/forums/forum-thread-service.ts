@@ -6,6 +6,7 @@
 import type { Forum, ForumThread } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { isEmptyRichBody } from "@/lib/content/rich-body-utils";
 import { findUserById } from "@/lib/users/user-service";
 import {
   userFailure,
@@ -35,6 +36,38 @@ import type {
   ForumThreadDetail,
   ForumThreadEntry,
 } from "./forum-types";
+
+async function loadForumSignaturesByUserIds(
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const uniqueIds = [...new Set(userIds)];
+
+  if (uniqueIds.length === 0) {
+    return new Map();
+  }
+
+  const profiles = await prisma.userProfile.findMany({
+    where: {
+      userId: { in: uniqueIds },
+      useBioAsForumSignature: true,
+      bio: { not: null },
+    },
+    select: {
+      userId: true,
+      bio: true,
+    },
+  });
+
+  const signatures = new Map<string, string>();
+
+  for (const profile of profiles) {
+    if (profile.bio?.trim() && !isEmptyRichBody(profile.bio)) {
+      signatures.set(profile.userId, profile.bio);
+    }
+  }
+
+  return signatures;
+}
 
 async function buildAuthorSnapshot(
   userId: string,
@@ -190,10 +223,17 @@ export async function getForumThreadDetail(
     ? await canModerateForum(userId, forum, context)
     : false;
 
+  const signatureUserIds = [
+    thread.authorUserId,
+    ...thread.posts.map((post) => post.authorUserId),
+  ];
+  const signatures = await loadForumSignaturesByUserIds(signatureUserIds);
+
   const posts: ForumPostEntry[] = thread.posts.map((post) => ({
     id: post.id,
     body: post.body,
     author: toAuthorEntry(post),
+    forumSignature: signatures.get(post.authorUserId) ?? null,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
   }));
@@ -208,6 +248,7 @@ export async function getForumThreadDetail(
     replyCount: thread._count.posts,
     createdAt: thread.createdAt.toISOString(),
     updatedAt: thread.updatedAt.toISOString(),
+    forumSignature: signatures.get(thread.authorUserId) ?? null,
     posts,
     canWrite: canWrite && !thread.isLocked,
     canModerate,
@@ -351,10 +392,13 @@ export async function createForumPost(
     data: { updatedAt: new Date() },
   });
 
+  const signatures = await loadForumSignaturesByUserIds([userId]);
+
   return userSuccess({
     id: post.id,
     body: post.body,
     author: toAuthorEntry(post),
+    forumSignature: signatures.get(userId) ?? null,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
   });

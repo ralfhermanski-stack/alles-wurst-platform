@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import ForumAuthor from "@/components/forums/ForumAuthor";
 import ForumComposer from "@/components/forums/ForumComposer";
+import ForumPostSignature from "@/components/forums/ForumPostSignature";
 import ForumRulesAcceptanceModal from "@/components/forums/ForumRulesAcceptanceModal";
 import type { ForumThreadDetail } from "@/lib/forums/forum-types";
 import { useForumRulesAcceptance } from "@/lib/forums/use-forum-rules-acceptance";
@@ -143,6 +144,9 @@ export default function MemberForumThreadPage({
         <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-aw-cream">
           {thread.body}
         </p>
+        {thread.forumSignature && (
+          <ForumPostSignature html={thread.forumSignature} />
+        )}
       </article>
 
       <section className="mt-8 space-y-4">
@@ -164,6 +168,9 @@ export default function MemberForumThreadPage({
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-aw-cream">
               {post.body}
             </p>
+            {post.forumSignature && (
+              <ForumPostSignature html={post.forumSignature} />
+            )}
           </article>
         ))}
       </section>

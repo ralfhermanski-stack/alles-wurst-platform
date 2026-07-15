@@ -67,6 +67,7 @@ export type ForumPostEntry = {
   id: string;
   body: string;
   author: ForumAuthorEntry;
+  forumSignature: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -78,6 +79,7 @@ export type ForumAuthorEntry = {
 };
 
 export type ForumThreadDetail = ForumThreadEntry & {
+  forumSignature: string | null;
   posts: ForumPostEntry[];
   canWrite: boolean;
   canModerate: boolean;

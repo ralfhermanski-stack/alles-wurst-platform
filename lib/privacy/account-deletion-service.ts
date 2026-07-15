@@ -186,6 +186,7 @@ async function performImmediateAccountDeletion(input: {
         lastName: "Benutzer",
         publicName: "Gelöschter Benutzer",
         bio: null,
+        useBioAsForumSignature: false,
         phone: null,
         avatarStorageKey: null,
       },
