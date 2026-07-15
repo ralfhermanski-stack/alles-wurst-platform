@@ -67,6 +67,7 @@ export default function AdminProductRecommendationCategoriesPanel({
     }
 
     setCategories(response.data);
+    setImageLoadErrors({});
     setDrafts(
       Object.fromEntries(
         response.data.map((category) => [
@@ -265,6 +266,43 @@ export default function AdminProductRecommendationCategoriesPanel({
     setError(`Vorschaubild für „${categoryName}“ konnte nicht geladen werden.`);
   }
 
+  async function handleToggleActive(category: ProductRecommendationCategoryEntry) {
+    if (
+      category.isActive &&
+      !window.confirm(
+        `Kategorie „${category.name}“ deaktivieren? Sie erscheint dann nicht mehr in der Werkstatt.`,
+      )
+    ) {
+      return;
+    }
+
+    setSavingCategoryId(category.id);
+    setError(null);
+
+    const response = await adminFetch<ProductRecommendationCategoryEntry>(
+      "/api/admin/werkstatt/produktempfehlungen/categories",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          id: category.id,
+          name: category.name,
+          description: category.description,
+          sortOrder: category.sortOrder,
+          isActive: !category.isActive,
+        }),
+      },
+    );
+
+    setSavingCategoryId(null);
+
+    if (!response.success) {
+      setError(response.error.message);
+      return;
+    }
+
+    await reload();
+  }
+
   async function handleDeleteCategory(category: ProductRecommendationCategoryEntry) {
     if (category.isSystemCategory) {
       setError("System-Kategorien können nicht gelöscht werden.");
@@ -356,7 +394,8 @@ export default function AdminProductRecommendationCategoriesPanel({
         <h2 className="font-semibold text-aw-cream">Kategorie-Standardbilder</h2>
         <p className="mt-1 text-sm text-aw-muted">
           Produkte ohne eigenes Bild zeigen das Standardbild ihrer Kategorie. Ohne
-          Upload wird das generische System-Platzhalterbild verwendet.
+          Upload wird das generische System-Platzhalterbild verwendet. Nicht benötigte
+          Kategorien kannst du deaktivieren — sie verschwinden dann in der Werkstatt.
         </p>
       </div>
 
@@ -379,7 +418,9 @@ export default function AdminProductRecommendationCategoriesPanel({
           return (
             <article
               key={category.id}
-              className="flex flex-col overflow-hidden rounded-xl border border-aw-border bg-aw-surface"
+              className={`flex flex-col overflow-hidden rounded-xl border bg-aw-surface ${
+                category.isActive ? "border-aw-border" : "border-aw-border/50 opacity-70"
+              }`}
             >
               <div className="relative aspect-[4/3] bg-aw-surface-2">
                 {previewUrl && !previewFailed ? (
@@ -558,6 +599,19 @@ export default function AdminProductRecommendationCategoriesPanel({
                       Bearbeiten
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    className={secondaryButtonClassName}
+                    disabled={isBusy}
+                    onClick={() => void handleToggleActive(category)}
+                  >
+                    {savingCategoryId === category.id
+                      ? "Speichert …"
+                      : category.isActive
+                        ? "Deaktivieren"
+                        : "Aktivieren"}
+                  </button>
 
                   {canDeleteCategory && (
                     <button

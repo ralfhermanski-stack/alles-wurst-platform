@@ -35,11 +35,7 @@ export async function ensureDefaultProductRecommendationCategories(): Promise<vo
         sortOrder: category.sortOrder,
         isActive: true,
       },
-      update: {
-        name: category.name,
-        sortOrder: category.sortOrder,
-        isActive: true,
-      },
+      update: {},
     });
   }
 }
@@ -180,6 +176,7 @@ export async function listPublishedProductRecommendations(filters?: {
   const products = await prisma.productRecommendation.findMany({
     where: {
       status: "published",
+      category: { isActive: true },
       ...(filters?.categorySlug
         ? { category: { slug: filters.categorySlug } }
         : {}),
