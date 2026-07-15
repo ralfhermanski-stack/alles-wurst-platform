@@ -216,12 +216,51 @@ export default function AdminProductRecommendationCategoriesPanel({
       return;
     }
 
-    clearPendingPreview(categoryId);
+    if (!response.data.storageKey) {
+      clearPendingPreview(categoryId);
+      setError("Bild-Upload fehlgeschlagen — keine Speicherreferenz vom Server.");
+      return;
+    }
+
+    const serverPreviewUrl = `/api/werkstatt/empfehlungen/images/category/${categoryId}`;
+
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              hasCustomPlaceholderImage: true,
+              placeholderImageUrl: serverPreviewUrl,
+            }
+          : category,
+      ),
+    );
+
     setImageVersions((current) => ({
       ...current,
       [categoryId]: (current[categoryId] ?? 0) + 1,
     }));
+
     await reload();
+  }
+
+  function handlePreviewLoad(categoryId: string, src: string) {
+    if (!src.startsWith("blob:")) {
+      clearPendingPreview(categoryId);
+      setImageLoadErrors((current) => ({ ...current, [categoryId]: false }));
+    }
+  }
+
+  function handlePreviewError(categoryId: string, src: string, categoryName: string) {
+    if (src.startsWith("blob:")) {
+      return;
+    }
+
+    setImageLoadErrors((current) => ({
+      ...current,
+      [categoryId]: true,
+    }));
+    setError(`Vorschaubild für „${categoryName}“ konnte nicht geladen werden.`);
   }
 
   async function handleResetPlaceholder(categoryId: string) {
@@ -296,18 +335,20 @@ export default function AdminProductRecommendationCategoriesPanel({
                 {previewUrl && !previewFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
+                    key={`${category.id}-${imageVersions[category.id] ?? 0}-${pendingPreviews[category.id] ? "local" : "remote"}`}
                     src={previewUrl}
                     alt={`Standardbild ${category.name}`}
                     className="absolute inset-0 h-full w-full object-cover"
-                    onError={() => {
-                      setImageLoadErrors((current) => ({
-                        ...current,
-                        [category.id]: true,
-                      }));
-                      setError(
-                        `Vorschaubild für „${category.name}“ konnte nicht geladen werden.`,
-                      );
-                    }}
+                    onLoad={(event) =>
+                      handlePreviewLoad(category.id, event.currentTarget.src)
+                    }
+                    onError={(event) =>
+                      handlePreviewError(
+                        category.id,
+                        event.currentTarget.src,
+                        category.name,
+                      )
+                    }
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center px-4 text-center text-sm text-aw-muted">

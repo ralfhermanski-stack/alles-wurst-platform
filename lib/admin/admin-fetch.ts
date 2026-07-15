@@ -30,6 +30,16 @@ export async function adminFetch<T>(
       },
     });
 
+    if (response.status === 413) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Die Datei ist zu groß für den Server (max. 5 MB).",
+        },
+      };
+    }
+
     const text = await response.text();
 
     if (!text.trim()) {

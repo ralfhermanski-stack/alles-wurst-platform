@@ -30,6 +30,10 @@ export function inferProductImageMimeType(fileName: string, mimeType: string): s
     return normalized;
   }
 
+  if (normalized === "image/pjpeg" || normalized === "image/x-png") {
+    return normalized === "image/pjpeg" ? "image/jpeg" : "image/png";
+  }
+
   const lowerName = fileName.toLowerCase();
 
   if (lowerName.endsWith(".webp")) {
