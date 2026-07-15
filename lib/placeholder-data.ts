@@ -354,6 +354,8 @@ export type Tool = {
   description: string;
   access: "Öffentlich" | "Premium" | "Club" | "Meister";
   icon: string;
+  /** Noch nicht verfügbar – Karte zeigt „Coming Soon“ statt Link. */
+  comingSoon?: boolean;
 };
 
 export const tools: Tool[] = [
@@ -404,6 +406,7 @@ export const tools: Tool[] = [
       "Technologieprofil deiner Rezeptur mit Referenzvergleich – die Meisterwerkstatt.",
     access: "Meister",
     icon: "analysis",
+    comingSoon: true,
   },
   {
     slug: "empfehlungen",
