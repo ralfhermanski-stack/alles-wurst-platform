@@ -96,3 +96,13 @@ export function getProductImagePublicUrl(productId: string, kind: "main" | "gall
 export function getCategoryPlaceholderPublicUrl(categoryId: string): string {
   return `/api/werkstatt/empfehlungen/images/category/${categoryId}`;
 }
+
+export function mimeTypeFromStorageKey(storageKey: string): string {
+  const normalized = storageKey.toLowerCase();
+
+  if (normalized.endsWith(".webp")) return "image/webp";
+  if (normalized.endsWith(".png")) return "image/png";
+  if (normalized.endsWith(".svg")) return "image/svg+xml";
+
+  return "image/jpeg";
+}

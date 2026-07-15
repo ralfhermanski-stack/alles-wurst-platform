@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { CATEGORY_PLACEHOLDER_IMAGES } from "@/lib/product-recommendations/product-recommendation-categories";
-import { readProductRecommendationImageBytes } from "@/lib/product-recommendations/product-recommendation-image-storage";
+import {
+  mimeTypeFromStorageKey,
+  readProductRecommendationImageBytes,
+} from "@/lib/product-recommendations/product-recommendation-image-storage";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -24,16 +27,20 @@ export async function GET(
   }
 
   if (category.placeholderImageStorageKey) {
-    const bytes = await readProductRecommendationImageBytes(
-      category.placeholderImageStorageKey,
-    );
+    try {
+      const bytes = await readProductRecommendationImageBytes(
+        category.placeholderImageStorageKey,
+      );
 
-    return new NextResponse(Buffer.from(bytes), {
-      headers: {
-        "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=86400",
-      },
-    });
+      return new NextResponse(Buffer.from(bytes), {
+        headers: {
+          "Content-Type": mimeTypeFromStorageKey(category.placeholderImageStorageKey),
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
+    } catch {
+      return new NextResponse(null, { status: 404 });
+    }
   }
 
   const placeholderPath = CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? CATEGORY_PLACEHOLDER_IMAGES.sonstiges;

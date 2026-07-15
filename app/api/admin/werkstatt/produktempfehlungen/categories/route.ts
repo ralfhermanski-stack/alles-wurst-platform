@@ -6,7 +6,10 @@ import {
   upsertProductRecommendationCategory,
   clearCategoryPlaceholderImage,
 } from "@/lib/product-recommendations/product-recommendation-admin-service";
-import { saveProductRecommendationImage } from "@/lib/product-recommendations/product-recommendation-image-storage";
+import {
+  inferProductImageMimeType,
+  saveProductRecommendationImage,
+} from "@/lib/product-recommendations/product-recommendation-image-storage";
 import { prisma } from "@/lib/db/prisma";
 
 export async function GET(request: Request): Promise<Response> {
@@ -64,21 +67,46 @@ export async function PUT(request: Request): Promise<Response> {
     );
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const saved = await saveProductRecommendationImage(
-    categoryId,
-    file.name,
-    file.type,
-    bytes,
-    "placeholder",
-  );
+  try {
+    const category = await prisma.productRecommendationCategory.findUnique({
+      where: { id: categoryId },
+      select: { id: true },
+    });
 
-  await prisma.productRecommendationCategory.update({
-    where: { id: categoryId },
-    data: { placeholderImageStorageKey: saved.storageKey },
-  });
+    if (!category) {
+      return NextResponse.json(
+        { success: false, error: { message: "Kategorie nicht gefunden." } },
+        { status: 404 },
+      );
+    }
 
-  return NextResponse.json({ success: true, data: { storageKey: saved.storageKey } });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const resolvedMimeType = inferProductImageMimeType(file.name, file.type || "");
+    const saved = await saveProductRecommendationImage(
+      categoryId,
+      file.name,
+      resolvedMimeType,
+      bytes,
+      "placeholder",
+    );
+
+    await prisma.productRecommendationCategory.update({
+      where: { id: categoryId },
+      data: { placeholderImageStorageKey: saved.storageKey },
+    });
+
+    return NextResponse.json({ success: true, data: { storageKey: saved.storageKey } });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : "Bild-Upload fehlgeschlagen.",
+        },
+      },
+      { status: 400 },
+    );
+  }
 }
 
 export async function DELETE(request: Request): Promise<Response> {

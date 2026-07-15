@@ -16,7 +16,7 @@ import {
   CATEGORY_PLACEHOLDER_IMAGES,
   DEFAULT_PRODUCT_RECOMMENDATION_CATEGORIES,
 } from "./product-recommendation-categories";
-import { getProductImagePublicUrl } from "./product-recommendation-image-storage";
+import { getCategoryPlaceholderPublicUrl, getProductImagePublicUrl } from "./product-recommendation-image-storage";
 import { ensureDefaultPartnerPrograms } from "./partner-program-service";
 import {
   ensureDefaultProductRecommendationCategories,
@@ -432,9 +432,7 @@ export async function listAdminProductRecommendationCategories(
     description: category.description,
     sortOrder: category.sortOrder,
     isActive: category.isActive,
-    placeholderImageUrl: category.placeholderImageStorageKey
-      ? `/api/werkstatt/empfehlungen/images/category/${category.id}`
-      : CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
+    placeholderImageUrl: getCategoryPlaceholderPublicUrl(category.id),
     hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
   }));
@@ -465,7 +463,7 @@ export async function clearCategoryPlaceholderImage(
     description: category.description,
     sortOrder: category.sortOrder,
     isActive: category.isActive,
-    placeholderImageUrl: CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
+    placeholderImageUrl: getCategoryPlaceholderPublicUrl(category.id),
     hasCustomPlaceholderImage: false,
     productCount: category._count.products,
   });
@@ -511,9 +509,7 @@ export async function upsertProductRecommendationCategory(input: {
     description: category.description,
     sortOrder: category.sortOrder,
     isActive: category.isActive,
-    placeholderImageUrl: category.placeholderImageStorageKey
-      ? `/api/werkstatt/empfehlungen/images/category/${category.id}`
-      : CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
+    placeholderImageUrl: getCategoryPlaceholderPublicUrl(category.id),
     hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
   };
