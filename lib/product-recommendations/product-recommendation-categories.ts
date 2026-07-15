@@ -44,3 +44,7 @@ export const CATEGORY_PLACEHOLDER_IMAGES: Record<string, string> = {
   grillzubehoer: "/images/placeholders/product-default.svg",
   sonstiges: "/images/placeholders/product-default.svg",
 };
+
+export function isDefaultProductRecommendationCategorySlug(slug: string): boolean {
+  return DEFAULT_PRODUCT_RECOMMENDATION_CATEGORIES.some((category) => category.slug === slug);
+}

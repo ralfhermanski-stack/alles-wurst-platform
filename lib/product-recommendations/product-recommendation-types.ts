@@ -14,6 +14,7 @@ export type ProductRecommendationCategoryEntry = {
   placeholderImageUrl: string | null;
   hasCustomPlaceholderImage: boolean;
   productCount: number;
+  isSystemCategory: boolean;
 };
 
 export type ProductRecommendationSummary = {

@@ -15,6 +15,7 @@ import {
 import {
   CATEGORY_PLACEHOLDER_IMAGES,
   DEFAULT_PRODUCT_RECOMMENDATION_CATEGORIES,
+  isDefaultProductRecommendationCategorySlug,
 } from "./product-recommendation-categories";
 import { getCategoryPlaceholderPublicUrl, getProductImagePublicUrl } from "./product-recommendation-image-storage";
 import { ensureDefaultPartnerPrograms } from "./partner-program-service";
@@ -435,7 +436,40 @@ export async function listAdminProductRecommendationCategories(
     placeholderImageUrl: getCategoryPlaceholderPublicUrl(category.id),
     hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
+    isSystemCategory: isDefaultProductRecommendationCategorySlug(category.slug),
   }));
+}
+
+export async function deleteProductRecommendationCategory(
+  categoryId: string,
+): Promise<UserServiceResult<{ deleted: boolean }>> {
+  const existing = await prisma.productRecommendationCategory.findUnique({
+    where: { id: categoryId },
+    include: { _count: { select: { products: true } } },
+  });
+
+  if (!existing) {
+    return userFailure({ code: "NOT_FOUND", message: "Kategorie nicht gefunden." });
+  }
+
+  if (isDefaultProductRecommendationCategorySlug(existing.slug)) {
+    return userFailure({
+      code: "VALIDATION_ERROR",
+      message:
+        "System-Kategorien können nicht gelöscht werden. Du kannst sie stattdessen deaktivieren.",
+    });
+  }
+
+  if (existing._count.products > 0) {
+    return userFailure({
+      code: "VALIDATION_ERROR",
+      message: `Kategorie kann nicht gelöscht werden — ${existing._count.products} Produkt(e) sind noch zugeordnet.`,
+    });
+  }
+
+  await prisma.productRecommendationCategory.delete({ where: { id: categoryId } });
+
+  return userSuccess({ deleted: true });
 }
 
 export async function clearCategoryPlaceholderImage(
@@ -466,6 +500,7 @@ export async function clearCategoryPlaceholderImage(
     placeholderImageUrl: getCategoryPlaceholderPublicUrl(category.id),
     hasCustomPlaceholderImage: false,
     productCount: category._count.products,
+    isSystemCategory: isDefaultProductRecommendationCategorySlug(category.slug),
   });
 }
 
@@ -512,6 +547,7 @@ export async function upsertProductRecommendationCategory(input: {
     placeholderImageUrl: getCategoryPlaceholderPublicUrl(category.id),
     hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
+    isSystemCategory: isDefaultProductRecommendationCategorySlug(category.slug),
   };
 }
 

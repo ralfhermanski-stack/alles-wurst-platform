@@ -9,6 +9,7 @@ import {
   labelClassName,
   primaryButtonClassName,
   secondaryButtonClassName,
+  dangerButtonClassName,
 } from "@/components/tools/recipe-generator/recipe-form-classes";
 
 const textareaClassName = `${inputClassName} min-h-[72px] resize-y`;
@@ -48,6 +49,7 @@ export default function AdminProductRecommendationCategoriesPanel({
   const [drafts, setDrafts] = useState<Record<string, CategoryDraft>>({});
   const [newCategory, setNewCategory] = useState<CategoryDraft>(emptyDraft);
   const [creatingCategory, setCreatingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const pendingPreviewUrlsRef = useRef<Set<string>>(new Set());
   const newCategoryInputId = useId();
@@ -263,6 +265,50 @@ export default function AdminProductRecommendationCategoriesPanel({
     setError(`Vorschaubild für „${categoryName}“ konnte nicht geladen werden.`);
   }
 
+  async function handleDeleteCategory(category: ProductRecommendationCategoryEntry) {
+    if (category.isSystemCategory) {
+      setError("System-Kategorien können nicht gelöscht werden.");
+      return;
+    }
+
+    if (category.productCount > 0) {
+      setError(
+        `„${category.name}“ hat noch ${category.productCount} Produkt(e) — zuerst verschieben oder löschen.`,
+      );
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Kategorie „${category.name}“ endgültig löschen? Dies kann nicht rückgängig gemacht werden.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingCategoryId(category.id);
+    setError(null);
+
+    const response = await adminFetch<{ deleted: boolean }>(
+      `/api/admin/werkstatt/produktempfehlungen/categories?categoryId=${category.id}&action=category`,
+      { method: "DELETE" },
+    );
+
+    setDeletingCategoryId(null);
+
+    if (!response.success) {
+      setError(response.error.message);
+      return;
+    }
+
+    if (editingCategoryId === category.id) {
+      setEditingCategoryId(null);
+    }
+
+    clearPendingPreview(category.id);
+    await reload();
+  }
+
   async function handleResetPlaceholder(categoryId: string) {
     if (
       !window.confirm(
@@ -319,7 +365,11 @@ export default function AdminProductRecommendationCategoriesPanel({
           const draft = drafts[category.id];
           const isEditing = editingCategoryId === category.id;
           const isBusy =
-            uploadingCategoryId === category.id || savingCategoryId === category.id;
+            uploadingCategoryId === category.id ||
+            savingCategoryId === category.id ||
+            deletingCategoryId === category.id;
+          const canDeleteCategory =
+            !category.isSystemCategory && category.productCount === 0;
           const previewUrl = pendingPreviews[category.id]
             ?? (category.placeholderImageUrl
               ? `${category.placeholderImageUrl}?v=${imageVersions[category.id] ?? 0}`
@@ -425,6 +475,7 @@ export default function AdminProductRecommendationCategoriesPanel({
                       {category.productCount} Produkt
                       {category.productCount === 1 ? "" : "e"}
                       {!category.isActive ? " · inaktiv" : ""}
+                      {category.isSystemCategory ? " · System-Kategorie" : ""}
                     </p>
                     {category.description && (
                       <p className="mt-2 line-clamp-2 text-sm text-aw-muted">
@@ -505,6 +556,17 @@ export default function AdminProductRecommendationCategoriesPanel({
                       onClick={() => setEditingCategoryId(category.id)}
                     >
                       Bearbeiten
+                    </button>
+                  )}
+
+                  {canDeleteCategory && (
+                    <button
+                      type="button"
+                      className={dangerButtonClassName}
+                      disabled={isBusy}
+                      onClick={() => void handleDeleteCategory(category)}
+                    >
+                      {deletingCategoryId === category.id ? "Wird gelöscht …" : "Löschen"}
                     </button>
                   )}
                 </div>

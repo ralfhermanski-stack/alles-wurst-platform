@@ -5,6 +5,7 @@ import {
   listAdminProductRecommendationCategories,
   upsertProductRecommendationCategory,
   clearCategoryPlaceholderImage,
+  deleteProductRecommendationCategory,
 } from "@/lib/product-recommendations/product-recommendation-admin-service";
 import { saveCategoryPlaceholderImage } from "@/lib/product-recommendations/product-recommendation-category-image-service";
 
@@ -97,6 +98,19 @@ export async function DELETE(request: Request): Promise<Response> {
 
   if (action === "placeholder") {
     const result = await clearCategoryPlaceholderImage(categoryId);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: { message: result.error.message } },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json({ success: true, data: result.data });
+  }
+
+  if (action === "category") {
+    const result = await deleteProductRecommendationCategory(categoryId);
 
     if (!result.success) {
       return NextResponse.json(

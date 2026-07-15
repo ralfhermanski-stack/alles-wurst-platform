@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import {
   CATEGORY_PLACEHOLDER_IMAGES,
   DEFAULT_PRODUCT_RECOMMENDATION_CATEGORIES,
+  isDefaultProductRecommendationCategorySlug,
 } from "./product-recommendation-categories";
 import { getProductImagePublicUrl } from "./product-recommendation-image-storage";
 import {
@@ -165,6 +166,7 @@ export async function listProductRecommendationCategories(): Promise<
       : CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
     hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
+    isSystemCategory: isDefaultProductRecommendationCategorySlug(category.slug),
   }));
 }
 
