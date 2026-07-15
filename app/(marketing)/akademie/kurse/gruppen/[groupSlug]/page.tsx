@@ -52,6 +52,8 @@ export default async function CourseGroupPage({ params }: GroupPageProps) {
           group.shortDescription ??
           `Alle veröffentlichten Kurse in „${group.name}".`
         }
+        imageSrc={`/api/course-groups/${group.id}/image`}
+        imageAlt={group.name}
       />
 
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">

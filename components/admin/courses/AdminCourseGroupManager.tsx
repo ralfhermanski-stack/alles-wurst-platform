@@ -438,10 +438,9 @@ export default function AdminCourseGroupManager() {
             Lernpfade verwalten
           </h1>
           <p className="mt-2 text-sm text-aw-muted">
-            Lernpfade erscheinen auf der Akademie-Seite. Pro Pfad kannst du
-            Module anlegen und Kurse zuordnen (beim Kurs unter Gruppe wählen).
-            Pfade mit zugeordneten Kursen können nur deaktiviert, nicht gelöscht
-            werden.
+            Lernpfade erscheinen auf der Akademie-Seite. Pro Pfad kannst du ein
+            Titelbild, optional Module und zugeordnete Kurse pflegen (beim Kurs
+            unter Gruppe wählen). Ohne eigenes Bild wird ein Platzhalter angezeigt.
           </p>
         </div>
       </div>
@@ -537,6 +536,9 @@ export default function AdminCourseGroupManager() {
               }))
             }
           />
+          <p className="mt-2 text-xs text-aw-muted">
+            Das Titelbild lädst du nach dem Anlegen im jeweiligen Lernpfad hoch.
+          </p>
         </div>
       </section>
 
@@ -617,6 +619,7 @@ export default function AdminCourseGroupManager() {
 
                 <div className="mt-4">
                   <AdminGroupImageUpload
+                    title="Lernpfad-Bild"
                     entityName={group.name}
                     imageUrl={`/api/course-groups/${group.id}/image?v=${imageVersion}`}
                     imageFileName={group.imageFileName}
