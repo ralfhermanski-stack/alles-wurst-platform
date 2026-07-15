@@ -11,6 +11,7 @@ import type {
   ProductRecommendationSummary,
   UpsertProductRecommendationInput,
 } from "@/lib/product-recommendations/product-recommendation-types";
+import AdminProductRecommendationCategoriesPanel from "@/components/admin/werkstatt/AdminProductRecommendationCategoriesPanel";
 import {
   inputClassName,
   labelClassName,
@@ -26,7 +27,10 @@ type AdminProduct = ProductRecommendationSummary & {
   affiliateClickCount: number;
 };
 
+type AdminTab = "products" | "categories";
+
 export default function AdminProductRecommendationsPanel() {
+  const [activeTab, setActiveTab] = useState<AdminTab>("products");
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<ProductRecommendationCategoryEntry[]>([]);
   const [analytics, setAnalytics] = useState<ProductRecommendationAnalytics | null>(null);
@@ -272,7 +276,6 @@ export default function AdminProductRecommendationsPanel() {
       masterRecommendationText: data.masterRecommendationText ?? "",
       seoTitle: data.seoTitle ?? "",
       seoDescription: data.seoDescription ?? "",
-      linkedCourseIds: data.linkedCourseIds,
       linkedRecipeIds: data.linkedRecipeIds,
     });
   }
@@ -292,12 +295,57 @@ export default function AdminProductRecommendationsPanel() {
     await reload();
   }
 
-  if (loading) {
-    return <p className="text-sm text-aw-muted">Produkte werden geladen …</p>;
+  if (loading && activeTab === "products") {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-wrap gap-2 border-b border-aw-border pb-4">
+          <button type="button" className={primaryButtonClassName} onClick={() => setActiveTab("products")}>
+            Produkte
+          </button>
+          <button
+            type="button"
+            className={secondaryButtonClassName}
+            onClick={() => setActiveTab("categories")}
+          >
+            Kategorien & Standardbilder
+          </button>
+        </div>
+        <p className="text-sm text-aw-muted">Produkte werden geladen …</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-wrap gap-2 border-b border-aw-border pb-4">
+        <button
+          type="button"
+          className={
+            activeTab === "products"
+              ? primaryButtonClassName
+              : secondaryButtonClassName
+          }
+          onClick={() => setActiveTab("products")}
+        >
+          Produkte
+        </button>
+        <button
+          type="button"
+          className={
+            activeTab === "categories"
+              ? primaryButtonClassName
+              : secondaryButtonClassName
+          }
+          onClick={() => setActiveTab("categories")}
+        >
+          Kategorien & Standardbilder
+        </button>
+      </div>
+
+      {activeTab === "categories" ? (
+        <AdminProductRecommendationCategoriesPanel onCategoriesChange={() => void reload()} />
+      ) : (
+        <>
       {analytics && (
         <section className="rounded-xl border border-aw-border p-4">
           <h2 className="font-semibold text-aw-cream">Statistik (Top 10)</h2>
@@ -612,6 +660,8 @@ export default function AdminProductRecommendationsPanel() {
         <p className="text-sm text-aw-warning" role="alert">
           {error}
         </p>
+      )}
+        </>
       )}
     </div>
   );

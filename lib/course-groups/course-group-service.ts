@@ -19,6 +19,8 @@ import type {
   CourseSubgroupRecord,
   CreateCourseGroupInput,
   CreateCourseSubgroupInput,
+  LearningPathAssignmentInput,
+  LearningPathAssignmentRecord,
   PublicCourseGroupCard,
   UpdateCourseGroupInput,
   UpdateCourseSubgroupInput,
@@ -61,7 +63,7 @@ async function allocateUniqueSubgroupSlug(
 
 function mapGroup(
   group: CourseGroup & {
-    _count?: { subgroups: number; courses: number };
+    _count?: { subgroups: number; courses: number; learningPathAssignments?: number };
   },
 ): CourseGroupRecord {
   return {
@@ -75,7 +77,8 @@ function mapGroup(
     sortOrder: group.sortOrder,
     isActive: group.isActive,
     subgroupCount: group._count?.subgroups ?? 0,
-    courseCount: group._count?.courses ?? 0,
+    courseCount:
+      group._count?.learningPathAssignments ?? group._count?.courses ?? 0,
     createdAt: group.createdAt.toISOString(),
     updatedAt: group.updatedAt.toISOString(),
   };
@@ -84,7 +87,7 @@ function mapGroup(
 function mapSubgroup(
   subgroup: CourseSubgroup & {
     courseGroup: { name: string; slug: string };
-    _count?: { courses: number };
+    _count?: { courses: number; learningPathAssignments?: number };
   },
 ): CourseSubgroupRecord {
   return {
@@ -97,7 +100,8 @@ function mapSubgroup(
     imageFileName: subgroup.imageFileName,
     sortOrder: subgroup.sortOrder,
     isActive: subgroup.isActive,
-    courseCount: subgroup._count?.courses ?? 0,
+    courseCount:
+      subgroup._count?.learningPathAssignments ?? subgroup._count?.courses ?? 0,
     groupName: subgroup.courseGroup.name,
     groupSlug: subgroup.courseGroup.slug,
     createdAt: subgroup.createdAt.toISOString(),
@@ -111,7 +115,13 @@ export async function listCourseGroups(options?: {
   const groups = await prisma.courseGroup.findMany({
     where: options?.activeOnly ? { isActive: true } : undefined,
     include: {
-      _count: { select: { subgroups: true, courses: true } },
+      _count: {
+        select: {
+          subgroups: true,
+          courses: true,
+          learningPathAssignments: true,
+        },
+      },
     },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
@@ -137,7 +147,9 @@ export async function listCourseSubgroups(options?: {
     where,
     include: {
       courseGroup: { select: { name: true, slug: true } },
-      _count: { select: { courses: true } },
+      _count: {
+        select: { courses: true, learningPathAssignments: true },
+      },
     },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
@@ -156,6 +168,9 @@ export async function listPublicCourseGroups(): Promise<PublicCourseGroupCard[]>
       _count: {
         select: {
           courses: { where: { status: "published" } },
+          learningPathAssignments: {
+            where: { course: { status: "published" } },
+          },
         },
       },
     },
@@ -170,7 +185,8 @@ export async function listPublicCourseGroups(): Promise<PublicCourseGroupCard[]>
     levelLabel: group.levelLabel,
     hasImage: Boolean(group.imageStorageKey),
     sortOrder: group.sortOrder,
-    courseCount: group._count.courses,
+    courseCount:
+      group._count.learningPathAssignments || group._count.courses,
     subgroupCount: group.subgroups.length,
     subgroups: group.subgroups.map((subgroup) => ({
       id: subgroup.id,
@@ -205,7 +221,13 @@ export async function getCourseGroupBySlug(
       ...(options?.activeOnly ? { isActive: true } : {}),
     },
     include: {
-      _count: { select: { subgroups: true, courses: true } },
+      _count: {
+        select: {
+          subgroups: true,
+          courses: true,
+          learningPathAssignments: true,
+        },
+      },
       subgroups: {
         where: options?.activeOnly ? { isActive: true } : undefined,
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -252,10 +274,18 @@ export async function getCourseSubgroupBySlugs(
     include: {
       courseGroup: {
         include: {
-          _count: { select: { subgroups: true, courses: true } },
+          _count: {
+            select: {
+              subgroups: true,
+              courses: true,
+              learningPathAssignments: true,
+            },
+          },
         },
       },
-      _count: { select: { courses: true } },
+      _count: {
+        select: { courses: true, learningPathAssignments: true },
+      },
     },
   });
 
@@ -691,4 +721,162 @@ export async function validateCourseGroupAssignment(
   }
 
   return userSuccess(true);
+}
+
+function mapLearningPathAssignment(
+  assignment: {
+    id: string;
+    courseGroupId: string;
+    courseSubgroupId: string | null;
+    sortOrder: number;
+    isPrimary: boolean;
+    courseGroup: { id: string; name: string; slug: string; isActive: boolean };
+    courseSubgroup: {
+      id: string;
+      name: string;
+      slug: string;
+      courseGroupId: string;
+      isActive: boolean;
+    } | null;
+  },
+): LearningPathAssignmentRecord {
+  return {
+    id: assignment.id,
+    courseGroupId: assignment.courseGroupId,
+    courseSubgroupId: assignment.courseSubgroupId,
+    sortOrder: assignment.sortOrder,
+    isPrimary: assignment.isPrimary,
+    group: {
+      id: assignment.courseGroup.id,
+      name: assignment.courseGroup.name,
+      slug: assignment.courseGroup.slug,
+      isActive: assignment.courseGroup.isActive,
+    },
+    subgroup: assignment.courseSubgroup
+      ? {
+          id: assignment.courseSubgroup.id,
+          name: assignment.courseSubgroup.name,
+          slug: assignment.courseSubgroup.slug,
+          courseGroupId: assignment.courseSubgroup.courseGroupId,
+          isActive: assignment.courseSubgroup.isActive,
+        }
+      : null,
+  };
+}
+
+const LEARNING_PATH_ASSIGNMENT_INCLUDE = {
+  courseGroup: {
+    select: { id: true, name: true, slug: true, isActive: true },
+  },
+  courseSubgroup: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      courseGroupId: true,
+      isActive: true,
+    },
+  },
+} as const;
+
+export async function listCourseLearningPathAssignments(
+  courseId: string,
+): Promise<LearningPathAssignmentRecord[]> {
+  const assignments = await prisma.courseLearningPathAssignment.findMany({
+    where: { courseId },
+    include: LEARNING_PATH_ASSIGNMENT_INCLUDE,
+    orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+  });
+
+  return assignments.map(mapLearningPathAssignment);
+}
+
+export async function syncCourseLearningPathAssignments(
+  courseId: string,
+  assignments: LearningPathAssignmentInput[],
+  options?: { requireActive?: boolean },
+): Promise<
+  UserServiceResult<{
+    primaryGroupId: string | null;
+    primarySubgroupId: string | null;
+    records: LearningPathAssignmentRecord[];
+  }>
+> {
+  const normalized = assignments
+    .map((assignment, index) => ({
+      courseGroupId: assignment.courseGroupId.trim(),
+      courseSubgroupId: assignment.courseSubgroupId?.trim() || null,
+      sortOrder: assignment.sortOrder ?? (index + 1) * 100,
+      isPrimary: assignment.isPrimary ?? false,
+    }))
+    .filter((assignment) => assignment.courseGroupId);
+
+  if (normalized.length === 0) {
+    return userFailure({
+      code: "VALIDATION_ERROR",
+      message: "Mindestens ein Lernpfad ist erforderlich.",
+    });
+  }
+
+  const groupIds = normalized.map((assignment) => assignment.courseGroupId);
+  const uniqueGroupIds = new Set(groupIds);
+
+  if (uniqueGroupIds.size !== groupIds.length) {
+    return userFailure({
+      code: "VALIDATION_ERROR",
+      message: "Jeder Lernpfad darf nur einmal zugeordnet werden.",
+    });
+  }
+
+  let primaryIndex = normalized.findIndex((assignment) => assignment.isPrimary);
+
+  if (primaryIndex < 0) {
+    primaryIndex = 0;
+  }
+
+  for (const assignment of normalized) {
+    const check = await validateCourseGroupAssignment(
+      assignment.courseGroupId,
+      assignment.courseSubgroupId,
+      options,
+    );
+
+    if (!check.success) {
+      return check as UserServiceResult<{
+        primaryGroupId: string | null;
+        primarySubgroupId: string | null;
+        records: LearningPathAssignmentRecord[];
+      }>;
+    }
+  }
+
+  const primary = normalized[primaryIndex];
+
+  await prisma.$transaction([
+    prisma.courseLearningPathAssignment.deleteMany({ where: { courseId } }),
+    prisma.courseLearningPathAssignment.createMany({
+      data: normalized.map((assignment, index) => ({
+        courseId,
+        courseGroupId: assignment.courseGroupId,
+        courseSubgroupId: assignment.courseSubgroupId,
+        sortOrder: assignment.sortOrder,
+        isPrimary: index === primaryIndex,
+      })),
+    }),
+    prisma.course.update({
+      where: { id: courseId },
+      data: {
+        courseGroupId: primary.courseGroupId,
+        courseSubgroupId: primary.courseSubgroupId,
+      },
+    }),
+  ]);
+
+  const records = await listCourseLearningPathAssignments(courseId);
+
+  return userSuccess({
+    primaryGroupId: primary.courseGroupId,
+    primarySubgroupId: primary.courseSubgroupId,
+    records,
+  });
 }

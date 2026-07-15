@@ -94,3 +94,20 @@ export type CourseGroupAssignment = {
   group: CourseGroupRef | null;
   subgroup: CourseSubgroupRef | null;
 };
+
+export type LearningPathAssignmentRecord = {
+  id: string;
+  courseGroupId: string;
+  courseSubgroupId: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  group: CourseGroupRef & { isActive: boolean };
+  subgroup: (CourseSubgroupRef & { isActive: boolean }) | null;
+};
+
+export type LearningPathAssignmentInput = {
+  courseGroupId: string;
+  courseSubgroupId?: string | null;
+  sortOrder?: number;
+  isPrimary?: boolean;
+};

@@ -96,8 +96,30 @@ export async function PATCH(
       body.courseSubgroupId === null
         ? null
         : getStringField(body, "courseSubgroupId") ?? undefined,
+    learningPathAssignments: Array.isArray(body.learningPathAssignments)
+      ? body.learningPathAssignments
+          .filter(
+            (item): item is Record<string, unknown> =>
+              typeof item === "object" && item !== null,
+          )
+          .map((item) => ({
+            courseGroupId: getStringField(item, "courseGroupId") ?? "",
+            courseSubgroupId:
+              item.courseSubgroupId === null
+                ? null
+                : getStringField(item, "courseSubgroupId") ?? null,
+            sortOrder:
+              typeof item.sortOrder === "number" ? item.sortOrder : undefined,
+            isPrimary:
+              typeof item.isPrimary === "boolean" ? item.isPrimary : undefined,
+          }))
+          .filter((item) => item.courseGroupId)
+      : undefined,
     learningGoals: Array.isArray(body.learningGoals)
       ? body.learningGoals.filter((item): item is string => typeof item === "string")
+      : undefined,
+    linkedProductIds: Array.isArray(body.linkedProductIds)
+      ? body.linkedProductIds.filter((item): item is string => typeof item === "string")
       : undefined,
   });
 

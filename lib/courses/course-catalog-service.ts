@@ -52,17 +52,25 @@ export async function listPublishedCourses(filters?: {
     status: "published",
   };
 
-  if (filters?.groupSlug) {
-    where.courseGroup = {
-      slug: filters.groupSlug,
-      isActive: true,
-    };
-  }
+  if (filters?.groupSlug || filters?.subgroupSlug) {
+    const assignmentFilter: Prisma.CourseLearningPathAssignmentWhereInput = {};
 
-  if (filters?.subgroupSlug) {
-    where.courseSubgroup = {
-      slug: filters.subgroupSlug,
-      isActive: true,
+    if (filters.groupSlug) {
+      assignmentFilter.courseGroup = {
+        slug: filters.groupSlug,
+        isActive: true,
+      };
+    }
+
+    if (filters.subgroupSlug) {
+      assignmentFilter.courseSubgroup = {
+        slug: filters.subgroupSlug,
+        isActive: true,
+      };
+    }
+
+    where.learningPathAssignments = {
+      some: assignmentFilter,
     };
   }
 

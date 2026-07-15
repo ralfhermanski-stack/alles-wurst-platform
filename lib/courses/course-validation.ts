@@ -44,6 +44,12 @@ export type CourseValidationInput = {
   courseSubgroupId?: string | null;
   groupIsActive?: boolean | null;
   subgroupIsActive?: boolean | null;
+  learningPathAssignments?: Array<{
+    groupName?: string | null;
+    subgroupName?: string | null;
+    groupIsActive: boolean;
+    subgroupIsActive?: boolean | null;
+  }>;
   modules: CourseValidationModule[];
 };
 
@@ -171,23 +177,42 @@ export function validateCourseForPublish(
     });
   }
 
-  if (!input.courseGroupId) {
+  if (input.learningPathAssignments && input.learningPathAssignments.length > 0) {
+    for (const assignment of input.learningPathAssignments) {
+      if (assignment.groupIsActive === false) {
+        issues.push({
+          path: "course.learningPathAssignments",
+          message: `Der Lernpfad „${assignment.groupName ?? "Unbekannt"}" ist inaktiv.`,
+        });
+      }
+
+      if (assignment.subgroupIsActive === false) {
+        issues.push({
+          path: "course.learningPathAssignments",
+          message: `Das Modul „${assignment.subgroupName ?? "Unbekannt"}" ist inaktiv.`,
+        });
+      }
+    }
+  } else if (!input.courseGroupId) {
     issues.push({
       path: "course.courseGroupId",
-      message: "Der Kurs braucht eine Hauptgruppe.",
+      message: "Der Kurs braucht mindestens einen Lernpfad.",
     });
   } else if (input.groupIsActive === false) {
     issues.push({
       path: "course.courseGroupId",
-      message: "Die gewählte Hauptgruppe ist inaktiv.",
+      message: "Der primäre Lernpfad ist inaktiv.",
     });
   }
 
-  if (input.courseSubgroupId) {
+  if (
+    input.courseSubgroupId &&
+    (!input.learningPathAssignments || input.learningPathAssignments.length === 0)
+  ) {
     if (input.subgroupIsActive === false) {
       issues.push({
         path: "course.courseSubgroupId",
-        message: "Die gewählte Untergruppe ist inaktiv.",
+        message: "Das gewählte Modul ist inaktiv.",
       });
     }
   }

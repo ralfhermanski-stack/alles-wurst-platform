@@ -163,6 +163,7 @@ export async function listProductRecommendationCategories(): Promise<
     placeholderImageUrl: category.placeholderImageStorageKey
       ? `/api/werkstatt/empfehlungen/images/category/${category.id}`
       : CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
+    hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
   }));
 }

@@ -17,6 +17,8 @@ import {
   type CourseCheckoutTarget,
 } from "./course-catalog-service";
 import type { CourseDetail } from "./course-types";
+import type { ProductRecommendationSummary } from "@/lib/product-recommendations/product-recommendation-types";
+import { listProductRecommendationsForCourse } from "@/lib/product-recommendations/product-recommendation-service";
 
 export type CourseSalesContext = {
   course: CourseDetail;
@@ -30,6 +32,7 @@ export type CourseSalesContext = {
     title: string;
   };
   reviewSummary: CourseReviewSummary;
+  workshopProducts: ProductRecommendationSummary[];
 };
 
 function resolveInstructor(template: CertificateTemplateEntry): {
@@ -68,11 +71,13 @@ export async function resolveCourseSalesContext(
     return null;
   }
 
-  const [hasAccess, checkoutTarget, template, reviewSummary] = await Promise.all([
+  const [hasAccess, checkoutTarget, template, reviewSummary, workshopProducts] =
+    await Promise.all([
     userId ? hasActiveCourseAccess(userId, course.id) : Promise.resolve(false),
     getCourseCheckoutTarget(course.productId),
     getCertificateTemplate(),
     getPublicCourseReviewSummary(course.id),
+    listProductRecommendationsForCourse(course.id),
   ]);
 
   const instructor = resolveInstructor(template);
@@ -86,5 +91,6 @@ export async function resolveCourseSalesContext(
     checkoutTarget,
     instructor,
     reviewSummary,
+    workshopProducts,
   };
 }

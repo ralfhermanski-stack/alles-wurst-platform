@@ -12,6 +12,7 @@ export type ProductRecommendationCategoryEntry = {
   sortOrder: number;
   isActive: boolean;
   placeholderImageUrl: string | null;
+  hasCustomPlaceholderImage: boolean;
   productCount: number;
 };
 

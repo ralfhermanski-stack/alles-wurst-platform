@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import CourseSalesPageContent from "@/components/courses/CourseSalesPageContent";
-import RecommendedProductsSection from "@/components/werkstatt/RecommendedProductsSection";
 import PageSeoJsonLd from "@/components/seo/PageSeoJsonLd";
 import { resolveCourseSalesContext } from "@/lib/courses/course-sales-context";
 import { getCourseForSales } from "@/lib/courses/course-catalog-service";
@@ -53,9 +52,6 @@ export default async function AkademieCourseDetailPage({ params }: PageProps) {
     <>
       <PageSeoJsonLd routeKey={buildRouteKey("course", slug)} />
       <CourseSalesPageContent context={context} />
-      <div className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-        <RecommendedProductsSection courseId={context.course.id} />
-      </div>
     </>
   );
 }

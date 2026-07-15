@@ -1349,6 +1349,7 @@ model Course {
   forums           Forum[]
   reviews          CourseReview[]
   productRecommendationLinks ProductRecommendationCourseLink[]
+  learningPathAssignments CourseLearningPathAssignment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1361,6 +1362,31 @@ model Course {
   @@index([courseGroupId])
   @@index([courseSubgroupId])
   @@map("courses")
+}
+
+/// Zuordnung Kurs ↔ Lernpfad (ein Kurs kann mehreren Lernpfaden angehören)
+model CourseLearningPathAssignment {
+  id String @id @default(uuid()) @db.Uuid
+
+  courseId String @map("course_id") @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  courseGroupId String      @map("course_group_id") @db.Uuid
+  courseGroup   CourseGroup @relation(fields: [courseGroupId], references: [id], onDelete: Cascade)
+
+  courseSubgroupId String?         @map("course_subgroup_id") @db.Uuid
+  courseSubgroup   CourseSubgroup? @relation(fields: [courseSubgroupId], references: [id], onDelete: SetNull)
+
+  sortOrder Int     @default(100) @map("sort_order")
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([courseId, courseGroupId])
+  @@index([courseGroupId])
+  @@index([courseSubgroupId])
+  @@map("course_learning_path_assignments")
 }
 
 /// Pflichtmodul innerhalb eines Kurses
@@ -1889,8 +1915,9 @@ model CourseGroup {
   sortOrder        Int     @default(0) @map("sort_order")
   isActive         Boolean @default(true) @map("is_active")
 
-  subgroups CourseSubgroup[]
-  courses   Course[]
+  subgroups               CourseSubgroup[]
+  courses                 Course[]
+  learningPathAssignments CourseLearningPathAssignment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1914,7 +1941,8 @@ model CourseSubgroup {
   sortOrder        Int     @default(0) @map("sort_order")
   isActive         Boolean @default(true) @map("is_active")
 
-  courses Course[]
+  courses                 Course[]
+  learningPathAssignments CourseLearningPathAssignment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

@@ -188,24 +188,8 @@ export async function getAdminProductRecommendation(
 
 async function syncLinks(
   productId: string,
-  linkedCourseIds?: string[],
   linkedRecipeIds?: string[],
 ): Promise<void> {
-  if (linkedCourseIds) {
-    await prisma.productRecommendationCourseLink.deleteMany({ where: { productId } });
-
-    if (linkedCourseIds.length > 0) {
-      await prisma.productRecommendationCourseLink.createMany({
-        data: linkedCourseIds.map((courseId, index) => ({
-          productId,
-          courseId,
-          sortOrder: (index + 1) * 10,
-        })),
-        skipDuplicates: true,
-      });
-    }
-  }
-
   if (linkedRecipeIds) {
     await prisma.productRecommendationRecipeLink.deleteMany({ where: { productId } });
 
@@ -220,6 +204,57 @@ async function syncLinks(
       });
     }
   }
+}
+
+export async function listLinkedProductIdsForCourse(
+  courseId: string,
+): Promise<string[]> {
+  const links = await prisma.productRecommendationCourseLink.findMany({
+    where: { courseId },
+    orderBy: { sortOrder: "asc" },
+    select: { productId: true },
+  });
+
+  return links.map((link) => link.productId);
+}
+
+export async function syncCourseProductRecommendationLinks(
+  courseId: string,
+  productIds: string[],
+): Promise<UserServiceResult<true>> {
+  const uniqueIds = [...new Set(productIds.filter(Boolean))];
+
+  if (uniqueIds.length > 0) {
+    const existing = await prisma.productRecommendation.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true },
+    });
+
+    if (existing.length !== uniqueIds.length) {
+      return userFailure({
+        code: "VALIDATION_ERROR",
+        message: "Mindestens eine Werkstatt-Empfehlung existiert nicht.",
+      });
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.productRecommendationCourseLink.deleteMany({ where: { courseId } }),
+    ...(uniqueIds.length > 0
+      ? [
+          prisma.productRecommendationCourseLink.createMany({
+            data: uniqueIds.map((productId, index) => ({
+              productId,
+              courseId,
+              sortOrder: (index + 1) * 10,
+            })),
+            skipDuplicates: true,
+          }),
+        ]
+      : []),
+  ]);
+
+  return userSuccess(true);
 }
 
 function buildAutoSeo(input: {
@@ -293,7 +328,7 @@ export async function createProductRecommendation(
     },
   });
 
-  await syncLinks(product.id, input.linkedCourseIds, input.linkedRecipeIds);
+  await syncLinks(product.id, input.linkedRecipeIds);
 
   const detail = await getAdminProductRecommendation(product.id);
 
@@ -357,7 +392,7 @@ export async function updateProductRecommendation(
     },
   });
 
-  await syncLinks(id, input.linkedCourseIds, input.linkedRecipeIds);
+  await syncLinks(id, input.linkedRecipeIds);
 
   const detail = await getAdminProductRecommendation(id);
 
@@ -400,8 +435,40 @@ export async function listAdminProductRecommendationCategories(
     placeholderImageUrl: category.placeholderImageStorageKey
       ? `/api/werkstatt/empfehlungen/images/category/${category.id}`
       : CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
+    hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
   }));
+}
+
+export async function clearCategoryPlaceholderImage(
+  categoryId: string,
+): Promise<UserServiceResult<ProductRecommendationCategoryEntry>> {
+  const existing = await prisma.productRecommendationCategory.findUnique({
+    where: { id: categoryId },
+    include: { _count: { select: { products: true } } },
+  });
+
+  if (!existing) {
+    return userFailure({ code: "NOT_FOUND", message: "Kategorie nicht gefunden." });
+  }
+
+  const category = await prisma.productRecommendationCategory.update({
+    where: { id: categoryId },
+    data: { placeholderImageStorageKey: null },
+    include: { _count: { select: { products: true } } },
+  });
+
+  return userSuccess({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    description: category.description,
+    sortOrder: category.sortOrder,
+    isActive: category.isActive,
+    placeholderImageUrl: CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
+    hasCustomPlaceholderImage: false,
+    productCount: category._count.products,
+  });
 }
 
 export async function upsertProductRecommendationCategory(input: {
@@ -447,6 +514,7 @@ export async function upsertProductRecommendationCategory(input: {
     placeholderImageUrl: category.placeholderImageStorageKey
       ? `/api/werkstatt/empfehlungen/images/category/${category.id}`
       : CATEGORY_PLACEHOLDER_IMAGES[category.slug] ?? null,
+    hasCustomPlaceholderImage: Boolean(category.placeholderImageStorageKey),
     productCount: category._count.products,
   };
 }

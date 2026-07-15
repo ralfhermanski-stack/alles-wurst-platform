@@ -15,7 +15,7 @@ import type {
   CourseType,
   UserCertificateStatus,
 } from "@prisma/client";
-import type { CourseGroupRef, CourseSubgroupRef } from "@/lib/course-groups/course-group-types";
+import type { CourseGroupRef, CourseSubgroupRef, LearningPathAssignmentRecord } from "@/lib/course-groups/course-group-types";
 
 export type CertificateProofType = "participation" | "achievement";
 
@@ -146,6 +146,8 @@ export type CourseSalesProductStatus = {
 
 export type AdminCourseRecord = Omit<CourseDetail, "modules"> & {
   modules: AdminCourseModuleEntry[];
+  learningPathAssignments: LearningPathAssignmentRecord[];
+  linkedProductIds: string[];
   createdAt: string;
   updatedAt: string;
   salesProduct: CourseSalesProductStatus;

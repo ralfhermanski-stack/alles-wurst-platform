@@ -4,6 +4,7 @@ import { adminGuardResponse } from "@/lib/admin/admin-api-utils";
 import {
   listAdminProductRecommendationCategories,
   upsertProductRecommendationCategory,
+  clearCategoryPlaceholderImage,
 } from "@/lib/product-recommendations/product-recommendation-admin-service";
 import { saveProductRecommendationImage } from "@/lib/product-recommendations/product-recommendation-image-storage";
 import { prisma } from "@/lib/db/prisma";
@@ -78,4 +79,38 @@ export async function PUT(request: Request): Promise<Response> {
   });
 
   return NextResponse.json({ success: true, data: { storageKey: saved.storageKey } });
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  const denied = await adminGuardResponse(request);
+  if (denied) return denied;
+
+  const url = new URL(request.url);
+  const categoryId = url.searchParams.get("categoryId") ?? "";
+  const action = url.searchParams.get("action");
+
+  if (!categoryId) {
+    return NextResponse.json(
+      { success: false, error: { message: "Kategorie-ID erforderlich." } },
+      { status: 400 },
+    );
+  }
+
+  if (action === "placeholder") {
+    const result = await clearCategoryPlaceholderImage(categoryId);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: { message: result.error.message } },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json({ success: true, data: result.data });
+  }
+
+  return NextResponse.json(
+    { success: false, error: { message: "Unbekannte Aktion." } },
+    { status: 400 },
+  );
 }

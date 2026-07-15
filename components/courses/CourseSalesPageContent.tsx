@@ -6,6 +6,7 @@ import CourseSalesCurriculum from "@/components/courses/CourseSalesCurriculum";
 import CourseSalesHero from "@/components/courses/CourseSalesHero";
 import CourseSalesPurchaseBox from "@/components/courses/CourseSalesPurchaseBox";
 import CourseSalesReviews from "@/components/courses/CourseSalesReviews";
+import CourseWorkshopProductLinks from "@/components/courses/CourseWorkshopProductLinks";
 import Markdown from "@/components/ui/Markdown";
 import {
   formatCourseProofLabel,
@@ -37,7 +38,7 @@ export default function CourseSalesPageContent({
 }: {
   context: CourseSalesContext;
 }) {
-  const { course, hasAccess, isLoggedIn, isAdmin, checkoutTarget, instructor, reviewSummary } =
+  const { course, hasAccess, isLoggedIn, isAdmin, checkoutTarget, instructor, reviewSummary, workshopProducts } =
     context;
 
   const proofLabel = formatCourseProofLabel(course.certificateType, course.courseType);
@@ -109,14 +110,17 @@ export default function CourseSalesPageContent({
             )}
 
             {/* 5. Was du zuhause benötigst */}
-            {course.requiredEquipment?.trim() && (
+            {(course.requiredEquipment?.trim() || workshopProducts.length > 0) && (
               <section className="max-w-3xl">
                 <SectionHeading>Was du zuhause benötigst</SectionHeading>
-                <Markdown
-                  content={course.requiredEquipment}
-                  variant="sales"
-                  className="mt-6"
-                />
+                {course.requiredEquipment?.trim() && (
+                  <Markdown
+                    content={course.requiredEquipment}
+                    variant="sales"
+                    className="mt-6"
+                  />
+                )}
+                <CourseWorkshopProductLinks products={workshopProducts} />
               </section>
             )}
 

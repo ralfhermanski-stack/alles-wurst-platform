@@ -50,7 +50,16 @@ import {
 import { parseVimeoVideoInput } from "./vimeo-embed";
 import { getCourseReviewStatsForAdmin } from "@/lib/reviews/course-review-service";
 import { ensureCourseForumInfrastructure } from "@/lib/forums/forum-service";
-import { validateCourseGroupAssignment } from "@/lib/course-groups/course-group-service";
+import {
+  validateCourseGroupAssignment,
+  syncCourseLearningPathAssignments,
+  listCourseLearningPathAssignments,
+} from "@/lib/course-groups/course-group-service";
+import {
+  syncCourseProductRecommendationLinks,
+  listLinkedProductIdsForCourse,
+} from "@/lib/product-recommendations/product-recommendation-admin-service";
+import type { LearningPathAssignmentInput } from "@/lib/course-groups/course-group-types";
 
 const COURSE_INCLUDE = {
   modules: {
@@ -75,9 +84,12 @@ type CourseWithModules = Prisma.CourseGetPayload<{ include: typeof COURSE_INCLUD
 
 async function toAdminRecord(course: CourseWithModules): Promise<AdminCourseRecord> {
   const detail = toAdminCourseDetail(course);
-  const [salesProduct, reviewStats] = await Promise.all([
+  const [salesProduct, reviewStats, learningPathAssignments, linkedProductIds] =
+    await Promise.all([
     getCourseSalesProductStatus(course.productId),
     getCourseReviewStatsForAdmin(course.id),
+    listCourseLearningPathAssignments(course.id),
+    listLinkedProductIdsForCourse(course.id),
   ]);
 
   return {
@@ -86,6 +98,8 @@ async function toAdminRecord(course: CourseWithModules): Promise<AdminCourseReco
     updatedAt: course.updatedAt.toISOString(),
     salesProduct,
     reviewStats,
+    learningPathAssignments,
+    linkedProductIds,
   };
 }
 
@@ -109,6 +123,7 @@ async function buildValidationInput(course: CourseWithModules) {
   const hasCertificateTemplate = requiredKind
     ? await hasReadyCertificateTemplate(requiredKind)
     : true;
+  const learningPathAssignments = await listCourseLearningPathAssignments(course.id);
 
   return {
     courseType: course.courseType,
@@ -125,6 +140,12 @@ async function buildValidationInput(course: CourseWithModules) {
     courseSubgroupId: course.courseSubgroupId,
     groupIsActive: course.courseGroup?.isActive ?? null,
     subgroupIsActive: course.courseSubgroup?.isActive ?? null,
+    learningPathAssignments: learningPathAssignments.map((assignment) => ({
+      groupName: assignment.group.name,
+      subgroupName: assignment.subgroup?.name ?? null,
+      groupIsActive: assignment.group.isActive,
+      subgroupIsActive: assignment.subgroup?.isActive ?? null,
+    })),
     modules: course.modules.map((courseModule) => ({
       id: courseModule.id,
       title: courseModule.title,
@@ -182,6 +203,8 @@ export type CreateCourseInput = {
   forumsEnabled?: boolean;
   courseGroupId?: string | null;
   courseSubgroupId?: string | null;
+  learningPathAssignments?: LearningPathAssignmentInput[];
+  linkedProductIds?: string[];
   productId?: string | null;
 };
 
@@ -369,7 +392,7 @@ export async function updateCourse(
 
     const nextStatus = input.status ?? existing.status;
 
-    const nextGroupId =
+    let nextGroupId =
       input.courseGroupId !== undefined
         ? input.courseGroupId
         : existing.courseGroupId;
@@ -395,15 +418,53 @@ export async function updateCourse(
       }
     }
 
-    if (nextGroupId) {
-      const assignmentCheck = await validateCourseGroupAssignment(
-        nextGroupId,
-        nextSubgroupId,
+    if (input.learningPathAssignments !== undefined) {
+      const syncResult = await syncCourseLearningPathAssignments(
+        courseId,
+        input.learningPathAssignments,
         { requireActive: nextStatus === "published" },
       );
 
-      if (!assignmentCheck.success) {
-        return assignmentCheck as UserServiceResult<AdminCourseRecord>;
+      if (!syncResult.success) {
+        return syncResult as UserServiceResult<AdminCourseRecord>;
+      }
+
+      nextGroupId = syncResult.data.primaryGroupId;
+      nextSubgroupId = syncResult.data.primarySubgroupId;
+    } else if (
+      input.courseGroupId !== undefined ||
+      input.courseSubgroupId !== undefined
+    ) {
+      if (nextGroupId) {
+        const assignmentCheck = await validateCourseGroupAssignment(
+          nextGroupId,
+          nextSubgroupId,
+          { requireActive: nextStatus === "published" },
+        );
+
+        if (!assignmentCheck.success) {
+          return assignmentCheck as UserServiceResult<AdminCourseRecord>;
+        }
+
+        const syncResult = await syncCourseLearningPathAssignments(
+          courseId,
+          [
+            {
+              courseGroupId: nextGroupId,
+              courseSubgroupId: nextSubgroupId,
+              isPrimary: true,
+            },
+          ],
+          { requireActive: nextStatus === "published" },
+        );
+
+        if (!syncResult.success) {
+          return syncResult as UserServiceResult<AdminCourseRecord>;
+        }
+      } else {
+        await prisma.courseLearningPathAssignment.deleteMany({
+          where: { courseId },
+        });
       }
     }
 
@@ -445,11 +506,15 @@ export async function updateCourse(
         homepageSortOrder: input.homepageSortOrder,
         forumsEnabled: input.forumsEnabled,
         courseGroupId:
-          input.courseGroupId !== undefined || input.courseSubgroupId !== undefined
+          input.learningPathAssignments !== undefined ||
+          input.courseGroupId !== undefined ||
+          input.courseSubgroupId !== undefined
             ? nextGroupId
             : undefined,
         courseSubgroupId:
-          input.courseGroupId !== undefined || input.courseSubgroupId !== undefined
+          input.learningPathAssignments !== undefined ||
+          input.courseGroupId !== undefined ||
+          input.courseSubgroupId !== undefined
             ? nextSubgroupId
             : undefined,
       },
@@ -457,6 +522,17 @@ export async function updateCourse(
 
     // 2. Verkaufsprodukt automatisch synchronisieren (Name/Preis/Beschreibung).
     await syncCourseProduct(courseId);
+
+    if (input.linkedProductIds !== undefined) {
+      const productLinkResult = await syncCourseProductRecommendationLinks(
+        courseId,
+        input.linkedProductIds,
+      );
+
+      if (!productLinkResult.success) {
+        return productLinkResult as UserServiceResult<AdminCourseRecord>;
+      }
+    }
 
     // 3. Bei Veröffentlichung nach der Synchronisierung validieren.
     if (nextStatus === "published") {
