@@ -28,6 +28,7 @@ export default function VimeoPlayer({ embedUrl, title }: VimeoPlayerProps) {
         allow="autoplay; fullscreen; picture-in-picture"
         allowFullScreen
         loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
       />
     </div>
   );
