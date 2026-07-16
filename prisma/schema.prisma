@@ -181,6 +181,16 @@ model Recipe {
   /// In offizieller Rezeptdatenbank übernommen
   isOfficialDatabase Boolean @default(false) @map("is_official_database")
 
+  /// Freigabe-Flag: „Rezept des Monats“ (für registrierte Mitglieder).
+  isRecipeOfMonth Boolean @default(false) @map("is_recipe_of_month")
+
+  /// Flag: Rezept ist ein „Kursrezept“ und soll in der Rezeptdatenbank
+  /// erst nach Kursbuchung freigegeben werden.
+  isCourseLinked Boolean @default(false) @map("is_course_linked")
+
+  /// Flag: „Besondere Meisterclub-Rezepte“, die nur Meisterclub-Mitglieder sehen sollen.
+  isMeisterclubSpecial Boolean @default(false) @map("is_meisterclub_special")
+
   /// Herkunft — nur USER-Rezepte dürfen geteilt werden
   source RecipeSource @default(USER)
 

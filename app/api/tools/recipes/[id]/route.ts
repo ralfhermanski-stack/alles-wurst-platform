@@ -95,12 +95,26 @@ export async function PATCH(
     }
   }
 
+  const isRecipeOfMonth =
+    typeof body.isRecipeOfMonth === "boolean"
+      ? body.isRecipeOfMonth
+      : undefined;
+  const isCourseLinked =
+    typeof body.isCourseLinked === "boolean" ? body.isCourseLinked : undefined;
+  const isMeisterclubSpecial =
+    typeof body.isMeisterclubSpecial === "boolean"
+      ? body.isMeisterclubSpecial
+      : undefined;
+
   const result = await updateRecipe(id, {
     userId,
     name: getStringField(body, "name"),
     category: getNullableStringField(body, "category"),
     description: getNullableStringField(body, "description"),
     payload,
+    isRecipeOfMonth,
+    isCourseLinked,
+    isMeisterclubSpecial,
   });
 
   return jsonFromServiceResult(result);

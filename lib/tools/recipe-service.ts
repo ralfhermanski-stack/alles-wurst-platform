@@ -36,6 +36,43 @@ import {
 } from "./recipe-payload-validator";
 import type { RecipePayload } from "./recipe-types";
 
+const FLEISCHERMEISTER_RALF_PUBLIC_NAME = "Fleischermeister_Ralf";
+
+let cachedRalfUserId: string | null | undefined = undefined;
+
+async function resolveRalfUserId(): Promise<string | null> {
+  if (cachedRalfUserId !== undefined) {
+    return cachedRalfUserId;
+  }
+
+  const profile = await prisma.userProfile.findUnique({
+    where: { publicName: FLEISCHERMEISTER_RALF_PUBLIC_NAME },
+    select: { userId: true },
+  });
+
+  cachedRalfUserId = profile?.userId ?? null;
+  return cachedRalfUserId;
+}
+
+async function assertCanSetDatabaseFlags(input: {
+  actorUserId: string;
+  flagsTouched: boolean;
+}): Promise<RecipeServiceResult<true>> {
+  if (!input.flagsTouched) {
+    return recipeSuccess(true);
+  }
+
+  const ralfUserId = await resolveRalfUserId();
+  if (!ralfUserId || input.actorUserId !== ralfUserId) {
+    return recipeFailure({
+      code: "FORBIDDEN",
+      message: "Diese Rezept-Flags dürfen nur von Fleischermeister_Ralf gesetzt werden.",
+    });
+  }
+
+  return recipeSuccess(true);
+}
+
 // =============================================================================
 // Öffentliche Typen
 // =============================================================================
@@ -49,6 +86,9 @@ export type RecipeRecord = {
   description: string | null;
   status: RecipeStatus;
   visibility: RecipeVisibility;
+  isRecipeOfMonth: boolean;
+  isCourseLinked: boolean;
+  isMeisterclubSpecial: boolean;
   totalWeightKg: number | null;
   payload: RecipePayload;
   version: number;
@@ -69,6 +109,9 @@ export type CreateRecipeInput = {
   payload?: RecipePayload;
   status?: RecipeStatus;
   visibility?: RecipeVisibility;
+  isRecipeOfMonth?: boolean;
+  isCourseLinked?: boolean;
+  isMeisterclubSpecial?: boolean;
   /** Mitgliedschaftskontext für Limit-Prüfung */
   membership?: MembershipAccessContext;
 };
@@ -80,6 +123,9 @@ export type UpdateRecipeInput = {
   category?: string | null;
   description?: string | null;
   payload?: RecipePayload;
+  isRecipeOfMonth?: boolean;
+  isCourseLinked?: boolean;
+  isMeisterclubSpecial?: boolean;
 };
 
 /** Filter für Rezeptlisten */
@@ -109,6 +155,9 @@ export function mapRecipeToRecord(recipe: Recipe): RecipeRecord {
     description: recipe.description,
     status: recipe.status,
     visibility: recipe.visibility,
+    isRecipeOfMonth: recipe.isRecipeOfMonth,
+    isCourseLinked: recipe.isCourseLinked,
+    isMeisterclubSpecial: recipe.isMeisterclubSpecial,
     totalWeightKg:
       recipe.totalWeightKg !== null
         ? Number(recipe.totalWeightKg)
@@ -347,6 +396,24 @@ export async function createRecipe(
   const status = input.status ?? RecipeStatus.draft;
   const visibility = input.visibility ?? RecipeVisibility.private;
 
+  const flagsTouched =
+    input.isRecipeOfMonth !== undefined ||
+    input.isCourseLinked !== undefined ||
+    input.isMeisterclubSpecial !== undefined;
+
+  const allowedFlags = await assertCanSetDatabaseFlags({
+    actorUserId: input.userId,
+    flagsTouched,
+  });
+
+  if (!allowedFlags.success) {
+    return allowedFlags;
+  }
+
+  const isRecipeOfMonth = input.isRecipeOfMonth ?? false;
+  const isCourseLinked = input.isCourseLinked ?? false;
+  const isMeisterclubSpecial = input.isMeisterclubSpecial ?? false;
+
   try {
     const recipe = await prisma.recipe.create({
       data: {
@@ -362,6 +429,9 @@ export async function createRecipe(
         recipeKind: "wurst",
         source: "USER",
         publishedAt: resolvePublishedAt(status, visibility, null),
+        isRecipeOfMonth,
+        isCourseLinked,
+        isMeisterclubSpecial,
       },
     });
 
@@ -546,6 +616,27 @@ export async function updateRecipe(
       const prepared = preparePayloadForStorage(payloadValidation.data);
       data.payload = prepared.payload as Prisma.InputJsonValue;
       data.totalWeightKg = prepared.totalWeightKg;
+      incrementVersion = true;
+    }
+
+    const flagsTouched =
+      input.isRecipeOfMonth !== undefined ||
+      input.isCourseLinked !== undefined ||
+      input.isMeisterclubSpecial !== undefined;
+
+    if (flagsTouched) {
+      const allowedFlags = await assertCanSetDatabaseFlags({
+        actorUserId: input.userId,
+        flagsTouched,
+      });
+
+      if (!allowedFlags.success) {
+        return allowedFlags;
+      }
+
+      data.isRecipeOfMonth = input.isRecipeOfMonth ?? false;
+      data.isCourseLinked = input.isCourseLinked ?? false;
+      data.isMeisterclubSpecial = input.isMeisterclubSpecial ?? false;
       incrementVersion = true;
     }
 

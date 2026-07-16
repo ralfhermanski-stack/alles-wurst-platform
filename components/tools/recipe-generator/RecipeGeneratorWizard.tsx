@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { RecipeStatus, RecipeVisibility } from "@prisma/client";
 
 import Icon from "@/components/brand/Icon";
+import { useAuth } from "@/lib/auth/use-auth";
 import RecipeLiveSummary from "@/components/tools/recipe-generator/RecipeLiveSummary";
 import RecipeCategorySelect from "@/components/tools/recipe-generator/RecipeCategorySelect";
 import RecipeJsonExportButton from "@/components/tools/recipe-generator/RecipeJsonExportButton";
@@ -81,6 +82,9 @@ export default function RecipeGeneratorWizard({
   adminMode = false,
 }: RecipeGeneratorWizardProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const showDatabaseFlags =
+    !adminMode && user?.profile?.publicName === "Fleischermeister_Ralf";
   const [recipeId, setRecipeId] = useState<string | undefined>(initialRecipeId);
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(Boolean(initialRecipeId));
@@ -96,6 +100,11 @@ export default function RecipeGeneratorWizard({
   const [visibility, setVisibility] = useState<RecipeVisibility>(
     RecipeVisibility.private,
   );
+
+  // Spezielle Flags für die Rezeptdatenbank (nur Fleischermeister_Ralf).
+  const [isRecipeOfMonth, setIsRecipeOfMonth] = useState(false);
+  const [isCourseLinked, setIsCourseLinked] = useState(false);
+  const [isMeisterclubSpecial, setIsMeisterclubSpecial] = useState(false);
 
   const [meats, setMeats] = useState<RecipeMeatLine[]>([]);
   const [binders, setBinders] = useState<RecipeBinderLine[]>([]);
@@ -247,6 +256,9 @@ export default function RecipeGeneratorWizard({
       description: string | null;
       status: RecipeStatus;
       visibility: RecipeVisibility;
+      isRecipeOfMonth: boolean;
+      isCourseLinked: boolean;
+      isMeisterclubSpecial: boolean;
       payload: RecipePayload;
       hasImage?: boolean;
       imageFileName?: string | null;
@@ -256,6 +268,9 @@ export default function RecipeGeneratorWizard({
       setDescription(data.description ?? "");
       setStatus(data.status);
       setVisibility(data.visibility);
+      setIsRecipeOfMonth(Boolean(data.isRecipeOfMonth));
+      setIsCourseLinked(Boolean(data.isCourseLinked));
+      setIsMeisterclubSpecial(Boolean(data.isMeisterclubSpecial));
       setHasImage(Boolean(data.hasImage));
       setImageFileName(data.imageFileName ?? null);
       setTotalWeightKg(
@@ -388,6 +403,13 @@ export default function RecipeGeneratorWizard({
         category: category.trim() || null,
         description: description.trim() || null,
         payload,
+        ...(showDatabaseFlags
+          ? {
+              isRecipeOfMonth,
+              isCourseLinked,
+              isMeisterclubSpecial,
+            }
+          : {}),
       });
 
       if (!response.success) {
@@ -428,6 +450,13 @@ export default function RecipeGeneratorWizard({
       payload,
       status: targetStatus,
       visibility,
+      ...(showDatabaseFlags
+        ? {
+            isRecipeOfMonth,
+            isCourseLinked,
+            isMeisterclubSpecial,
+          }
+        : {}),
     });
 
     if (!response.success) {
@@ -1145,6 +1174,38 @@ export default function RecipeGeneratorWizard({
                 </select>
               </div>
             </div>
+
+            {showDatabaseFlags && (
+              <div className="mt-6 rounded-xl border border-aw-border bg-aw-surface/40 p-4">
+                <h4 className="font-semibold text-aw-cream">Rezeptdatenbank-Flags</h4>
+                <div className="mt-4 space-y-3 text-sm text-aw-muted">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isRecipeOfMonth}
+                      onChange={(e) => setIsRecipeOfMonth(e.target.checked)}
+                    />
+                    Rezept des Monats
+                  </label>
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isCourseLinked}
+                      onChange={(e) => setIsCourseLinked(e.target.checked)}
+                    />
+                    Kurszugehörig (erst nach Kursbuchung freigeben)
+                  </label>
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isMeisterclubSpecial}
+                      onChange={(e) => setIsMeisterclubSpecial(e.target.checked)}
+                    />
+                    Meisterclub-Spezialrezept
+                  </label>
+                </div>
+              </div>
+            )}
 
             <RecipePlausibilityList
               issues={plausibilityResult.issues}

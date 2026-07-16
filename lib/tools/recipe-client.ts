@@ -41,6 +41,9 @@ export type ApiRecipe = {
   description: string | null;
   status: RecipeStatus;
   visibility: RecipeVisibility;
+  isRecipeOfMonth: boolean;
+  isCourseLinked: boolean;
+  isMeisterclubSpecial: boolean;
   totalWeightKg: number | null;
   payload: RecipePayload;
   version: number;
@@ -158,6 +161,9 @@ export async function createRecipeApi(input: {
   payload?: RecipePayload;
   status?: RecipeStatus;
   visibility?: RecipeVisibility;
+  isRecipeOfMonth?: boolean;
+  isCourseLinked?: boolean;
+  isMeisterclubSpecial?: boolean;
 }): Promise<ApiResponse<ApiRecipe>> {
   return apiRequest<ApiRecipe>("/api/tools/recipes", {
     method: "POST",
@@ -174,6 +180,9 @@ export async function updateRecipeApi(
     category?: string | null;
     description?: string | null;
     payload?: RecipePayload;
+    isRecipeOfMonth?: boolean;
+    isCourseLinked?: boolean;
+    isMeisterclubSpecial?: boolean;
   },
 ): Promise<ApiResponse<ApiRecipe>> {
   return apiRequest<ApiRecipe>(`/api/tools/recipes/${id}`, {

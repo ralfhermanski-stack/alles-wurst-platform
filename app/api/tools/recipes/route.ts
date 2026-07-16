@@ -116,6 +116,15 @@ export async function POST(request: Request): Promise<Response> {
       ? (visibilityRaw as RecipeVisibility)
       : undefined;
 
+  const isRecipeOfMonth =
+    typeof body.isRecipeOfMonth === "boolean" ? body.isRecipeOfMonth : undefined;
+  const isCourseLinked =
+    typeof body.isCourseLinked === "boolean" ? body.isCourseLinked : undefined;
+  const isMeisterclubSpecial =
+    typeof body.isMeisterclubSpecial === "boolean"
+      ? body.isMeisterclubSpecial
+      : undefined;
+
   const membership = await buildRecipeMembershipContext(request, userId, body);
 
   const result = await createRecipe({
@@ -126,6 +135,9 @@ export async function POST(request: Request): Promise<Response> {
     payload,
     status,
     visibility,
+    isRecipeOfMonth,
+    isCourseLinked,
+    isMeisterclubSpecial,
     membership,
   });
 
