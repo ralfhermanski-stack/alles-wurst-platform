@@ -380,6 +380,24 @@ export const PLATFORM_TEXT_DEFAULTS: PlatformTextDefault[] = [
     "Stimmen aus der Community",
   ),
   t(
+    "homepage.members.eyebrow",
+    "headings",
+    "Startseite — Community-Mitglieder Eyebrow",
+    "Unsere Community",
+  ),
+  t(
+    "homepage.members.title",
+    "headings",
+    "Startseite — Community-Mitglieder Titel",
+    "Wurstfreunde auf Alles Wurst",
+  ),
+  t(
+    "homepage.members.subtitle",
+    "headings",
+    "Startseite — Community-Mitglieder Untertitel",
+    "Bereits {{memberCount}} registrierte Mitglieder sind dabei.",
+  ),
+  t(
     "homepage.reviews.title",
     "headings",
     "Startseite — Community-Bewertungen Titel",

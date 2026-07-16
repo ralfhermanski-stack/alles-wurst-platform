@@ -85,9 +85,9 @@ async function main() {
 
   assert(
     readProjectFile("lib/reviews/member-count-service.ts").includes(
-      'passwordHash: { not: null }',
+      "REGISTERED_PUBLIC_MEMBER_WHERE",
     ),
-    "Mitgliederzählung zählt registrierte Nutzer mit Passwort",
+    "Mitgliederzählung nutzt zentrale Registrierungs-Filter",
   );
 
   assert(

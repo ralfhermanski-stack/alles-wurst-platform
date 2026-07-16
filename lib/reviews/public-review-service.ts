@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import {
   countPublicMembers,
   formatPublicMemberCount,
+  REGISTERED_PUBLIC_MEMBER_WHERE,
 } from "./member-count-service";
 import { getHomepageCommunityReviewsSettings } from "./homepage-reviews-settings-service";
 import type {
@@ -20,18 +21,7 @@ import type {
 } from "./public-review-types";
 
 function getPublicUserFilter() {
-  if (process.env.NODE_ENV === "development") {
-    return {
-      deletedAt: null,
-      accountStatus: "active" as const,
-    };
-  }
-
-  return {
-    deletedAt: null,
-    accountStatus: "active" as const,
-    systemRole: "USER" as const,
-  };
+  return REGISTERED_PUBLIC_MEMBER_WHERE;
 }
 
 const MAX_REVIEWS = 20;

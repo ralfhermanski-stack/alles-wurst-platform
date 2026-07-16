@@ -11,6 +11,7 @@ import BlogCard from "@/components/cards/BlogCard";
 import HelpSupportCard from "@/components/help/HelpSupportCard";
 import HelpHubCards from "@/components/help/HelpHubCards";
 import HomepageCommunitySocialSection from "@/components/marketing/HomepageCommunitySocialSection";
+import HomepageCommunityMembersSection from "@/components/marketing/HomepageCommunityMembersSection";
 import PhilosophySection from "@/components/marketing/PhilosophySection";
 import HomepageCommunityReviewsSection from "@/components/marketing/HomepageCommunityReviewsSection";
 import {
@@ -338,6 +339,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <HomepageCommunityMembersSection />
 
       <HomepageCommunityReviewsSection />
 
