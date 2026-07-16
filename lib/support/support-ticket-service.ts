@@ -335,6 +335,12 @@ export async function getUserSupportInbox(
   };
 }
 
+export async function countUnreadSupportTickets(userId: string): Promise<number> {
+  return prisma.supportTicket.count({
+    where: { userId, userUnreadCount: { gt: 0 }, anonymizedAt: null },
+  });
+}
+
 export async function listUserSupportTickets(
   userId: string,
 ): Promise<SupportTicketSummary[]> {
@@ -785,6 +791,18 @@ export async function addStaffSupportReply(
     "Support hat geantwortet.",
     staffUserId,
   );
+
+  const { createUserAccountMessage } = await import(
+    "@/lib/account/account-message-service"
+  );
+
+  await createUserAccountMessage({
+    userId: ticket.userId,
+    messageType: "ticket_reply",
+    title: `Neue Antwort zu Ticket ${ticket.ticketNumber}`,
+    body: `Der Support hat auf „${ticket.subject}" geantwortet.`,
+    linkUrl: `/mein-bereich/support/${ticket.ticketNumber}`,
+  });
 
   const ticketUser = await prisma.user.findUnique({
     where: { id: ticket.userId },

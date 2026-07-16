@@ -19,6 +19,7 @@ import ProfileEditor from "@/components/member/ProfileEditor";
 import PlatformReviewPanel from "@/components/member/PlatformReviewPanel";
 import MemberQuickLinks from "@/components/member/MemberQuickLinks";
 import MembershipManagePanel from "@/components/member/MembershipManagePanel";
+import { useMemberNotificationCounts } from "@/lib/member/use-member-notification-counts";
 
 type ApiSuccess<T> = { success: true; data: T };
 type ApiFailure = {
@@ -64,6 +65,7 @@ function computeProfileCompletion(profile: MyProfileResponse | null): {
 
 export default function MeinBereichContent() {
   const { user, loading, refresh } = useAuth();
+  const { supportUnreadCount } = useMemberNotificationCounts();
 
   const [courses, setCourses] = useState<UserCourseEntry[]>([]);
   const [certificates, setCertificates] = useState<CertificateSummary[]>([]);
@@ -145,6 +147,28 @@ export default function MeinBereichContent() {
         <p className="mt-4 text-sm text-aw-warning" role="alert">
           {error}
         </p>
+      )}
+
+      {supportUnreadCount > 0 && (
+        <div
+          className="mt-6 rounded-xl border border-aw-gold/40 bg-aw-gold/10 px-4 py-4 sm:px-5"
+          role="status"
+        >
+          <p className="font-semibold text-aw-cream">
+            {supportUnreadCount === 1
+              ? "Du hast eine neue Support-Antwort"
+              : `Du hast ${supportUnreadCount} neue Support-Antworten`}
+          </p>
+          <p className="mt-1 text-sm text-aw-muted">
+            Wir haben auf dein Ticket geantwortet — schau in deinen Support-Posteingang.
+          </p>
+          <Link
+            href="/mein-bereich/support"
+            className="mt-3 inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+          >
+            Zu meinen Tickets →
+          </Link>
+        </div>
       )}
 
       <section className="mt-8">

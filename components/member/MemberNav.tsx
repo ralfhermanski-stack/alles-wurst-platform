@@ -4,26 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { useMemberNotificationCounts } from "@/lib/member/use-member-notification-counts";
 import { MEMBER_NAV_PERMISSIONS } from "@/lib/permissions/navigation-permissions";
+
+function formatBadgeCount(count: number): string {
+  return count > 9 ? "9+" : String(count);
+}
 
 /**
  * Horizontale Unter-Navigation für den Mitgliederbereich (permission-gefiltert).
  */
 export default function MemberNav() {
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { messageUnreadCount, supportUnreadCount } = useMemberNotificationCounts();
   const [allowedKeys, setAllowedKeys] = useState<Set<string> | null>(null);
 
   useEffect(() => {
-    void Promise.all([
-      fetch("/api/account/messages/unread-count", { credentials: "include" }).then((r) => r.json()),
-      fetch("/api/account/permissions", { credentials: "include" }).then((r) => r.json()),
-    ])
-      .then(([messagesJson, permsJson]) => {
-        if (messagesJson.success && messagesJson.data) {
-          setUnreadCount(messagesJson.data.unreadCount);
-        }
-
+    void fetch("/api/account/permissions", { credentials: "include" })
+      .then((response) => response.json())
+      .then((permsJson) => {
         if (permsJson.success && permsJson.data?.permissionKeys) {
           setAllowedKeys(new Set(permsJson.data.permissionKeys as string[]));
         }
@@ -51,8 +50,14 @@ export default function MemberNav() {
           pathname === item.href ||
           (item.href !== "/mein-bereich" && pathname.startsWith(item.href));
 
-        const showBadge =
-          item.href === "/mein-bereich/nachrichten" && unreadCount > 0;
+        const badgeCount =
+          item.href === "/mein-bereich/nachrichten"
+            ? messageUnreadCount
+            : item.href === "/mein-bereich/support"
+              ? supportUnreadCount
+              : 0;
+
+        const showBadge = badgeCount > 0;
 
         return (
           <Link
@@ -66,8 +71,11 @@ export default function MemberNav() {
           >
             {item.label}
             {showBadge && (
-              <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg">
-                {unreadCount > 9 ? "9+" : unreadCount}
+              <span
+                className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg"
+                aria-label={`${badgeCount} ungelesen`}
+              >
+                {formatBadgeCount(badgeCount)}
               </span>
             )}
           </Link>

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useMemberNotificationCounts } from "@/lib/member/use-member-notification-counts";
+
 const QUICK_LINKS = [
   { href: "/mein-bereich/kurse", label: "Meine Kurse", desc: "Fortschritt & Lektionen" },
   { href: "/mein-bereich/bestellungen", label: "Bestellungen", desc: "Rechnungen & Käufe" },
@@ -12,8 +14,13 @@ const QUICK_LINKS = [
   { href: "/mein-bereich/mitgliedschaft", label: "Mitgliedschaft", desc: "Laufzeit & Kündigung" },
 ] as const;
 
+function formatBadgeCount(count: number): string {
+  return count > 9 ? "9+" : String(count);
+}
+
 export default function MemberQuickLinks() {
   const pathname = usePathname();
+  const { messageUnreadCount, supportUnreadCount } = useMemberNotificationCounts();
 
   return (
     <nav
@@ -23,6 +30,13 @@ export default function MemberQuickLinks() {
       {QUICK_LINKS.map((item) => {
         const active =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+        const badgeCount =
+          item.href === "/mein-bereich/nachrichten"
+            ? messageUnreadCount
+            : item.href === "/mein-bereich/support"
+              ? supportUnreadCount
+              : 0;
 
         return (
           <Link
@@ -34,7 +48,17 @@ export default function MemberQuickLinks() {
                 : "border-aw-border bg-aw-surface/40 hover:border-aw-gold/30"
             }`}
           >
-            <p className="font-semibold text-aw-cream">{item.label}</p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-semibold text-aw-cream">{item.label}</p>
+              {badgeCount > 0 && (
+                <span
+                  className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg"
+                  aria-label={`${badgeCount} ungelesen`}
+                >
+                  {formatBadgeCount(badgeCount)}
+                </span>
+              )}
+            </div>
             <p className="mt-0.5 text-xs text-aw-muted">{item.desc}</p>
           </Link>
         );
