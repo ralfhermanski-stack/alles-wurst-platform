@@ -7,6 +7,10 @@ import {
   isAllowedAvatarFile,
   saveUserAvatar,
 } from "@/lib/users/user-avatar-storage";
+import {
+  MAX_AVATAR_BYTES,
+  MAX_AVATAR_SIZE_LABEL,
+} from "@/lib/users/user-avatar-limits";
 
 /**
  * POST /api/users/me/avatar — Profilbild hochladen.
@@ -52,6 +56,15 @@ export async function POST(request: Request): Promise<Response> {
       userFailure({
         code: "VALIDATION_ERROR",
         message: "Nur JPG, PNG oder WebP sind erlaubt.",
+      }),
+    );
+  }
+
+  if (file.size > MAX_AVATAR_BYTES) {
+    return jsonFromAuthResult(
+      userFailure({
+        code: "VALIDATION_ERROR",
+        message: `Avatar ist zu groß (max. ${MAX_AVATAR_SIZE_LABEL}).`,
       }),
     );
   }

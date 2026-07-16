@@ -4,6 +4,10 @@ import { useId, useRef, useState } from "react";
 
 import UserAvatar from "@/components/member/UserAvatar";
 import {
+  MAX_AVATAR_BYTES,
+  MAX_AVATAR_SIZE_LABEL,
+} from "@/lib/users/user-avatar-limits";
+import {
   primaryButtonClassName,
   secondaryButtonClassName,
 } from "@/components/tools/recipe-generator/recipe-form-classes";
@@ -44,6 +48,12 @@ export default function ProfileAvatarUpload({
     setUploading(true);
     setLocalError(null);
 
+    if (file.size > MAX_AVATAR_BYTES) {
+      setUploading(false);
+      setLocalError(`Die Datei ist zu groß (max. ${MAX_AVATAR_SIZE_LABEL}).`);
+      return;
+    }
+
     const success = await onUpload(file);
 
     setUploading(false);
@@ -70,7 +80,8 @@ export default function ProfileAvatarUpload({
     <div className="sm:col-span-2 rounded-lg border border-aw-border bg-aw-bg/30 p-4">
       <p className="text-sm font-semibold text-aw-cream">Profilbild</p>
       <p className="mt-1 text-xs text-aw-muted">
-        JPG, PNG oder WebP, max. 2 MB. Wird öffentlich in Bewertungen angezeigt.
+        JPG, PNG oder WebP, max. {MAX_AVATAR_SIZE_LABEL}. Wird öffentlich in
+        Bewertungen angezeigt.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-4">

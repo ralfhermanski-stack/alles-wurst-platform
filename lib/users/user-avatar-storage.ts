@@ -6,8 +6,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import {
+  MAX_AVATAR_BYTES,
+  MAX_AVATAR_SIZE_LABEL,
+} from "@/lib/users/user-avatar-limits";
+
 const STORAGE_ROOT = path.join(process.cwd(), "storage", "user-avatars");
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 export function buildPublicAvatarUrl(userId: string): string {
   return `/api/users/${userId}/avatar`;
@@ -29,7 +33,7 @@ export async function saveUserAvatar(
   bytes: Uint8Array,
 ): Promise<{ storageKey: string; fileName: string }> {
   if (bytes.byteLength > MAX_AVATAR_BYTES) {
-    throw new Error("Avatar ist zu groß (max. 2 MB).");
+    throw new Error(`Avatar ist zu groß (max. ${MAX_AVATAR_SIZE_LABEL}).`);
   }
 
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
