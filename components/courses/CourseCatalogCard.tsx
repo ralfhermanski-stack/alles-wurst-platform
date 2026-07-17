@@ -70,7 +70,7 @@ export default function CourseCatalogCard({ course }: { course: CourseSummary })
         />
 
         {course.shortDescription && (
-          <p className="mt-2 flex-1 text-sm leading-6 text-aw-muted">
+          <p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-aw-muted">
             {course.shortDescription}
           </p>
         )}

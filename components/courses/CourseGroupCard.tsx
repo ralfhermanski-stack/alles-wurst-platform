@@ -28,7 +28,7 @@ export default function CourseGroupCard({ group, href }: CourseGroupCardProps) {
           {group.name}
         </h3>
         {group.shortDescription && (
-          <p className="mt-2 flex-1 text-sm leading-6 text-aw-muted">
+          <p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-aw-muted">
             {group.shortDescription}
           </p>
         )}
