@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import Icon from "@/components/brand/Icon";
-import CourseGroupLinks from "@/components/courses/CourseGroupLinks";
 import CourseSalesPurchaseBox from "@/components/courses/CourseSalesPurchaseBox";
 import {
   COURSE_TYPE_LABELS,
@@ -120,11 +119,6 @@ export default function CourseSalesHero({ context }: CourseSalesHeroProps) {
                   {course.shortDescription}
                 </p>
               )}
-              <CourseGroupLinks
-                group={course.group}
-                subgroup={course.subgroup}
-                className="mt-4"
-              />
             </div>
 
             <ul className="space-y-2.5">

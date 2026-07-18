@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { useAuth } from "@/lib/auth/use-auth";
 import { useMemberNotificationCounts } from "@/lib/member/use-member-notification-counts";
 import { MEMBER_NAV_PERMISSIONS } from "@/lib/permissions/navigation-permissions";
 
@@ -16,6 +17,7 @@ function formatBadgeCount(count: number): string {
  */
 export default function MemberNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const { messageUnreadCount, supportUnreadCount } = useMemberNotificationCounts();
   const [allowedKeys, setAllowedKeys] = useState<Set<string> | null>(null);
 
@@ -33,12 +35,31 @@ export default function MemberNav() {
   }, [pathname]);
 
   const navItems = useMemo(() => {
-    if (!allowedKeys) {
-      return MEMBER_NAV_PERMISSIONS;
+    const base = !allowedKeys
+      ? MEMBER_NAV_PERMISSIONS
+      : MEMBER_NAV_PERMISSIONS.filter((item) => allowedKeys.has(item.permissionKey));
+
+    if (!user?.maintenanceBypass) {
+      return base;
     }
 
-    return MEMBER_NAV_PERMISSIONS.filter((item) => allowedKeys.has(item.permissionKey));
-  }, [allowedKeys]);
+    const betaItem = {
+      label: "Betatest",
+      href: "/mein-bereich/betatest",
+      permissionKey: "general.member-area.view",
+    };
+
+    const overviewIndex = base.findIndex((item) => item.href === "/mein-bereich");
+    if (overviewIndex < 0) {
+      return [betaItem, ...base];
+    }
+
+    return [
+      ...base.slice(0, overviewIndex + 1),
+      betaItem,
+      ...base.slice(overviewIndex + 1),
+    ];
+  }, [allowedKeys, user?.maintenanceBypass]);
 
   return (
     <nav

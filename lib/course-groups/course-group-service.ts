@@ -812,9 +812,18 @@ export async function syncCourseLearningPathAssignments(
     .filter((assignment) => assignment.courseGroupId);
 
   if (normalized.length === 0) {
-    return userFailure({
-      code: "VALIDATION_ERROR",
-      message: "Mindestens ein Lernpfad ist erforderlich.",
+    await prisma.$transaction([
+      prisma.courseLearningPathAssignment.deleteMany({ where: { courseId } }),
+      prisma.course.update({
+        where: { id: courseId },
+        data: { courseGroupId: null, courseSubgroupId: null },
+      }),
+    ]);
+
+    return userSuccess({
+      primaryGroupId: null,
+      primarySubgroupId: null,
+      records: [],
     });
   }
 
@@ -824,7 +833,7 @@ export async function syncCourseLearningPathAssignments(
   if (uniqueGroupIds.size !== groupIds.length) {
     return userFailure({
       code: "VALIDATION_ERROR",
-      message: "Jeder Lernpfad darf nur einmal zugeordnet werden.",
+      message: "Jede Kursgruppe darf nur einmal zugeordnet werden.",
     });
   }
 

@@ -149,6 +149,38 @@ export default function MeinBereichContent() {
         </p>
       )}
 
+      {user?.maintenanceBypass && (
+        <div
+          className="mt-6 rounded-xl border border-aw-gold/40 bg-aw-gold/10 px-4 py-4 sm:px-5"
+          role="status"
+        >
+          <p className="font-semibold text-aw-cream">Du bist Beta-Tester</p>
+          <p className="mt-1 text-sm text-aw-muted">
+            Schau in deine Aufträge oder starte direkt in der Werkstatt und Akademie.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              href="/mein-bereich/betatest"
+              className="inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+            >
+              Zu den Beta-Aufträgen →
+            </Link>
+            <Link
+              href="/werkstatt"
+              className="inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+            >
+              Zur Werkstatt →
+            </Link>
+            <Link
+              href="/akademie/kurse"
+              className="inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+            >
+              Zum Kurskatalog →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {supportUnreadCount > 0 && (
         <div
           className="mt-6 rounded-xl border border-aw-gold/40 bg-aw-gold/10 px-4 py-4 sm:px-5"
@@ -195,14 +227,23 @@ export default function MeinBereichContent() {
             {activeCourses.length === 0 ? (
               <div className="mt-4 rounded-lg border border-dashed border-aw-border px-4 py-6 text-center">
                 <p className="text-sm text-aw-muted">
-                  Noch keine Kurse gebucht.
+                  Noch keine Kurse gebucht — kein Problem. Du kannst schon jetzt die
+                  Werkstatt nutzen oder den Katalog ansehen.
                 </p>
-                <Link
-                  href="/akademie/kurse"
-                  className="mt-3 inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
-                >
-                  Kurskatalog →
-                </Link>
+                <div className="mt-3 flex flex-wrap justify-center gap-4">
+                  <Link
+                    href="/akademie/kurse"
+                    className="inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+                  >
+                    Kurskatalog →
+                  </Link>
+                  <Link
+                    href="/werkstatt"
+                    className="inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+                  >
+                    Werkstatt →
+                  </Link>
+                </div>
               </div>
             ) : (
               <ul className="mt-4 space-y-3">

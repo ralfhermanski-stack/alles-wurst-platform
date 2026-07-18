@@ -52,6 +52,20 @@ export async function requirePagePermission(pathname: string): Promise<void> {
   const allowed = await hasPermission(userId, route.permissionKey);
 
   if (!allowed) {
+    // Öffentliche Werkstatt-Tools bleiben auch für eingeloggte Nutzer ohne
+    // explizite Permission nutzbar — sonst wären sie schlechter gestellt als Gäste.
+    if (route.permissionKey.startsWith("workshop.")) {
+      const publicTools = [
+        "workshop.home.view",
+        "workshop.salt-calculator.view",
+        "workshop.product-recommendations.view",
+      ];
+
+      if (publicTools.includes(route.permissionKey)) {
+        return;
+      }
+    }
+
     if (pathname.startsWith("/admin")) {
       redirect("/?error=forbidden");
     }

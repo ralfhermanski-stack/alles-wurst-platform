@@ -15,14 +15,6 @@ import {
   uploadCourseCoverApi,
 } from "@/lib/courses/admin-course-client";
 import {
-  listCourseGroupsApi,
-  listCourseSubgroupsApi,
-} from "@/lib/course-groups/course-group-admin-client";
-import type {
-  CourseGroupRecord,
-  CourseSubgroupRecord,
-} from "@/lib/course-groups/course-group-types";
-import {
   COURSE_STATUS_LABELS,
   COURSE_TYPE_LABELS,
 } from "@/lib/courses/course-labels";
@@ -38,25 +30,6 @@ import {
 import MarkdownField from "@/components/admin/MarkdownField";
 import AdminCourseModulesPanel from "@/components/admin/courses/AdminCourseModulesPanel";
 import AdminCourseProductPicker from "@/components/admin/courses/AdminCourseProductPicker";
-
-type LearningPathDraft = {
-  key: string;
-  courseGroupId: string;
-  courseSubgroupId: string;
-  isPrimary: boolean;
-};
-
-function createLearningPathDraft(
-  partial?: Partial<LearningPathDraft>,
-): LearningPathDraft {
-  return {
-    key: crypto.randomUUID(),
-    courseGroupId: "",
-    courseSubgroupId: "",
-    isPrimary: false,
-    ...partial,
-  };
-}
 
 function centsToEuroInput(cents: number | null): string {
   if (cents === null || cents === undefined) {
@@ -140,13 +113,6 @@ export default function AdminCourseEditor({ courseId }: AdminCourseEditorProps) 
   const [featuredOnHomepage, setFeaturedOnHomepage] = useState(false);
   const [homepageSortOrder, setHomepageSortOrder] = useState(100);
   const [forumsEnabled, setForumsEnabled] = useState(false);
-  const [learningPathDrafts, setLearningPathDrafts] = useState<LearningPathDraft[]>(
-    () => [createLearningPathDraft({ isPrimary: true })],
-  );
-  const [courseGroups, setCourseGroups] = useState<CourseGroupRecord[]>([]);
-  const [courseSubgroups, setCourseSubgroups] = useState<CourseSubgroupRecord[]>(
-    [],
-  );
   const [salesProductLoading, setSalesProductLoading] = useState(false);
 
   const [validationIssues, setValidationIssues] = useState<CourseValidationIssue[]>(
@@ -188,79 +154,6 @@ export default function AdminCourseEditor({ courseId }: AdminCourseEditorProps) 
   }
 
   useEffect(() => {
-    void (async () => {
-      const [groupsResponse, subgroupsResponse] = await Promise.all([
-        listCourseGroupsApi(),
-        listCourseSubgroupsApi(),
-      ]);
-
-      if (groupsResponse.success) {
-        setCourseGroups(groupsResponse.data);
-      }
-
-      if (subgroupsResponse.success) {
-        setCourseSubgroups(subgroupsResponse.data);
-      }
-    })();
-  }, []);
-
-  function subgroupsForGroup(groupId: string, currentSubgroupId?: string) {
-    return courseSubgroups.filter(
-      (subgroup) =>
-        subgroup.courseGroupId === groupId &&
-        (subgroup.isActive || subgroup.id === currentSubgroupId),
-    );
-  }
-
-  function updateLearningPathDraft(
-    key: string,
-    patch: Partial<LearningPathDraft>,
-  ) {
-    setLearningPathDrafts((current) =>
-      current.map((draft) => (draft.key === key ? { ...draft, ...patch } : draft)),
-    );
-  }
-
-  function handleLearningPathGroupChange(key: string, nextGroupId: string) {
-    updateLearningPathDraft(key, {
-      courseGroupId: nextGroupId,
-      courseSubgroupId: "",
-    });
-  }
-
-  function setPrimaryLearningPath(key: string) {
-    setLearningPathDrafts((current) =>
-      current.map((draft) => ({
-        ...draft,
-        isPrimary: draft.key === key,
-      })),
-    );
-  }
-
-  function addLearningPathDraft() {
-    setLearningPathDrafts((current) => [
-      ...current,
-      createLearningPathDraft({ isPrimary: current.length === 0 }),
-    ]);
-  }
-
-  function removeLearningPathDraft(key: string) {
-    setLearningPathDrafts((current) => {
-      if (current.length <= 1) {
-        return current;
-      }
-
-      const next = current.filter((draft) => draft.key !== key);
-
-      if (!next.some((draft) => draft.isPrimary)) {
-        next[0] = { ...next[0], isPrimary: true };
-      }
-
-      return next;
-    });
-  }
-
-  useEffect(() => {
     if (!courseId) {
       return;
     }
@@ -295,27 +188,6 @@ export default function AdminCourseEditor({ courseId }: AdminCourseEditorProps) 
       setFeaturedOnHomepage(response.data.featuredOnHomepage);
       setHomepageSortOrder(response.data.homepageSortOrder);
       setForumsEnabled(response.data.forumsEnabled);
-      if (response.data.learningPathAssignments.length > 0) {
-        setLearningPathDrafts(
-          response.data.learningPathAssignments.map((assignment) => ({
-            key: assignment.id,
-            courseGroupId: assignment.courseGroupId,
-            courseSubgroupId: assignment.courseSubgroupId ?? "",
-            isPrimary: assignment.isPrimary,
-          })),
-        );
-      } else if (response.data.courseGroupId) {
-        setLearningPathDrafts([
-          createLearningPathDraft({
-            key: "legacy",
-            courseGroupId: response.data.courseGroupId,
-            courseSubgroupId: response.data.courseSubgroupId ?? "",
-            isPrimary: true,
-          }),
-        ]);
-      } else {
-        setLearningPathDrafts([createLearningPathDraft({ isPrimary: true })]);
-      }
       void refreshValidation(courseId);
     })();
   }, [courseId]);
@@ -363,14 +235,7 @@ export default function AdminCourseEditor({ courseId }: AdminCourseEditorProps) 
       featuredOnHomepage,
       homepageSortOrder,
       forumsEnabled,
-      learningPathAssignments: learningPathDrafts
-        .filter((draft) => draft.courseGroupId)
-        .map((draft, index) => ({
-          courseGroupId: draft.courseGroupId,
-          courseSubgroupId: draft.courseSubgroupId || null,
-          isPrimary: draft.isPrimary,
-          sortOrder: (index + 1) * 100,
-        })),
+      learningPathAssignments: [],
     };
 
     const response = courseId
@@ -388,16 +253,6 @@ export default function AdminCourseEditor({ courseId }: AdminCourseEditorProps) 
     }
 
     setCourse(response.data);
-    if (response.data.learningPathAssignments.length > 0) {
-      setLearningPathDrafts(
-        response.data.learningPathAssignments.map((assignment) => ({
-          key: assignment.id,
-          courseGroupId: assignment.courseGroupId,
-          courseSubgroupId: assignment.courseSubgroupId ?? "",
-          isPrimary: assignment.isPrimary,
-        })),
-      );
-    }
     setLinkedProductIds(response.data.linkedProductIds ?? []);
     void refreshValidation(courseId);
   }
@@ -596,135 +451,6 @@ export default function AdminCourseEditor({ courseId }: AdminCourseEditorProps) 
                 </option>
               ))}
             </select>
-          </div>
-          <div className="md:col-span-2">
-            <div className="flex items-center justify-between gap-3">
-              <label className={labelClassName}>
-                Lernpfade{requiredMark}
-              </label>
-              <button
-                type="button"
-                className={`${secondaryButtonClassName} text-xs`}
-                onClick={addLearningPathDraft}
-              >
-                Lernpfad hinzufügen
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-aw-muted">
-              Ein Kurs kann einem oder mehreren Lernpfaden zugeordnet werden. Der
-              primäre Lernpfad steuert die Hauptkategorie im Katalog.
-            </p>
-            <div className="mt-3 space-y-3">
-              {learningPathDrafts.map((draft, index) => {
-                const usedGroupIds = new Set(
-                  learningPathDrafts
-                    .filter((entry) => entry.key !== draft.key && entry.courseGroupId)
-                    .map((entry) => entry.courseGroupId),
-                );
-                const selectableGroups = courseGroups.filter(
-                  (group) =>
-                    group.id === draft.courseGroupId ||
-                    (!usedGroupIds.has(group.id) &&
-                      (group.isActive || group.id === draft.courseGroupId)),
-                );
-                const selectableSubgroups = draft.courseGroupId
-                  ? subgroupsForGroup(draft.courseGroupId, draft.courseSubgroupId)
-                  : [];
-
-                return (
-                  <div
-                    key={draft.key}
-                    className="rounded-xl border border-aw-border bg-aw-surface-2/40 p-4"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-aw-cream">
-                        Lernpfad {index + 1}
-                      </p>
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-xs text-aw-muted">
-                          <input
-                            type="radio"
-                            name="primary-learning-path"
-                            checked={draft.isPrimary}
-                            onChange={() => setPrimaryLearningPath(draft.key)}
-                          />
-                          Primär
-                        </label>
-                        {learningPathDrafts.length > 1 && (
-                          <button
-                            type="button"
-                            className="text-xs text-aw-muted transition-colors hover:text-red-400"
-                            onClick={() => removeLearningPathDraft(draft.key)}
-                          >
-                            Entfernen
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label
-                          className="text-xs font-medium text-aw-muted"
-                          htmlFor={`learning-path-group-${draft.key}`}
-                        >
-                          Lernpfad
-                        </label>
-                        <select
-                          id={`learning-path-group-${draft.key}`}
-                          className={`${selectClassName} mt-1`}
-                          value={draft.courseGroupId}
-                          onChange={(e) =>
-                            handleLearningPathGroupChange(draft.key, e.target.value)
-                          }
-                        >
-                          <option value="">— Bitte wählen —</option>
-                          {selectableGroups.map((group) => (
-                            <option key={group.id} value={group.id}>
-                              {group.name}
-                              {!group.isActive ? " (inaktiv)" : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label
-                          className="text-xs font-medium text-aw-muted"
-                          htmlFor={`learning-path-subgroup-${draft.key}`}
-                        >
-                          Modul (optional)
-                        </label>
-                        <select
-                          id={`learning-path-subgroup-${draft.key}`}
-                          className={`${selectClassName} mt-1`}
-                          value={draft.courseSubgroupId}
-                          disabled={!draft.courseGroupId}
-                          onChange={(e) =>
-                            updateLearningPathDraft(draft.key, {
-                              courseSubgroupId: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">— Keines —</option>
-                          {selectableSubgroups.map((subgroup) => (
-                            <option key={subgroup.id} value={subgroup.id}>
-                              {subgroup.name}
-                              {!subgroup.isActive ? " (inaktiv)" : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-xs text-aw-muted">
-              Lernpfade werden unter{" "}
-              <Link href="/admin/kurse/gruppen" className="text-aw-gold hover:underline">
-                Lernpfade
-              </Link>{" "}
-              verwaltet.
-            </p>
           </div>
           <div>
             <label className={labelClassName} htmlFor="certificate-type">

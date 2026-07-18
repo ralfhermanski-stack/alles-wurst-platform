@@ -18,7 +18,8 @@ export default function EmailVerificationBanner() {
   const { user, loading, refresh } = useAuth();
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get("verifyEmail") === "1";
-  const isBeta = searchParams.get("beta") === "1";
+  const isBeta =
+    searchParams.get("beta") === "1" || Boolean(user?.maintenanceBypass);
 
   const [dismissed, setDismissed] = useState(false);
   const [sending, setSending] = useState(false);

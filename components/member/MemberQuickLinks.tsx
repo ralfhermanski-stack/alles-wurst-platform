@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useAuth } from "@/lib/auth/use-auth";
 import { useMemberNotificationCounts } from "@/lib/member/use-member-notification-counts";
 
-const QUICK_LINKS = [
+const BASE_QUICK_LINKS = [
+  { href: "/werkstatt", label: "Werkstatt", desc: "Rechner & Generatoren" },
+  { href: "/akademie/kurse", label: "Kurskatalog", desc: "Kurse entdecken" },
   { href: "/mein-bereich/kurse", label: "Meine Kurse", desc: "Fortschritt & Lektionen" },
   { href: "/mein-bereich/bestellungen", label: "Bestellungen", desc: "Rechnungen & Käufe" },
   { href: "/mein-bereich/nachrichten", label: "Nachrichten", desc: "System & Bestätigungen" },
@@ -20,14 +23,26 @@ function formatBadgeCount(count: number): string {
 
 export default function MemberQuickLinks() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const { messageUnreadCount, supportUnreadCount } = useMemberNotificationCounts();
+
+  const quickLinks = user?.maintenanceBypass
+    ? [
+        {
+          href: "/mein-bereich/betatest",
+          label: "Betatest",
+          desc: "Deine Testaufträge",
+        },
+        ...BASE_QUICK_LINKS,
+      ]
+    : BASE_QUICK_LINKS;
 
   return (
     <nav
       className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
       aria-label="Schnellzugriff Mein Bereich"
     >
-      {QUICK_LINKS.map((item) => {
+      {quickLinks.map((item) => {
         const active =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
 

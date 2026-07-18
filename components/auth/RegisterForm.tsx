@@ -98,10 +98,9 @@ export default function RegisterForm({
     }
 
     setRecipeUserId(response.data.user.id);
-    // Nach Registrierung auf die Startseite: Banner weist auf E-Mail-Bestätigung hin,
-    // Nutzer (inkl. Beta) können sich parallel schon umsehen.
+    // Beta-Tester: direkt zu den Aufträgen; sonst Startseite mit Verify-Banner.
     const target = inviteToken
-      ? "/?verifyEmail=1&beta=1"
+      ? "/mein-bereich/betatest?verifyEmail=1"
       : "/?verifyEmail=1";
     window.location.assign(target);
   }

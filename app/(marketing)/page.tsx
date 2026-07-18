@@ -4,7 +4,6 @@ import Hero from "@/components/marketing/Hero";
 import PlatformText from "@/components/platform-text/PlatformText";
 import PlatformImage from "@/components/platform-text/PlatformImage";
 import CourseCatalogCard from "@/components/courses/CourseCatalogCard";
-import CourseGroupCard from "@/components/courses/CourseGroupCard";
 import ToolCard from "@/components/cards/ToolCard";
 import MembershipCard from "@/components/cards/MembershipCard";
 import BlogCard from "@/components/cards/BlogCard";
@@ -18,7 +17,6 @@ import {
   listFeaturedHomepageCourses,
   listLatestCourses,
 } from "@/lib/courses/course-catalog-service";
-import { listPublicCourseGroups } from "@/lib/course-groups/course-group-service";
 import {
   formatHomepageHeroStatValue,
   getHomepageHeroStats,
@@ -44,13 +42,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [featuredCourses, courseGroups, latestBlogPosts, heroStats] =
-    await Promise.all([
-      listFeaturedHomepageCourses(),
-      listPublicCourseGroups(),
-      getHomepageBlogPosts(3),
-      getHomepageHeroStats(),
-    ]);
+  const [featuredCourses, latestBlogPosts, heroStats] = await Promise.all([
+    listFeaturedHomepageCourses(),
+    getHomepageBlogPosts(3),
+    getHomepageHeroStats(),
+  ]);
   const latestCourses = await listLatestCourses(
     3,
     featuredCourses.map((course) => course.id),
@@ -163,38 +159,6 @@ export default async function HomePage() {
 
       {/* Philosophie */}
       <PhilosophySection values={philosophyValues} quote={philosophyQuote} />
-
-      {/* Kursbereiche */}
-      {courseGroups.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <PlatformText
-                textKey="home.courses.eyebrow"
-                elementType="subheading"
-                as="p"
-                className="text-xs font-medium uppercase tracking-[0.25em] text-aw-gold"
-              />
-            <h2 className="mt-2 font-display text-3xl font-bold text-aw-cream">
-              <PlatformText
-                textKey="home.courses.title"
-                elementType="heading"
-                as="span"
-              />
-            </h2>
-            <PlatformText
-                textKey="home.courses.description"
-                elementType="text"
-                as="p"
-                className="mt-4 text-base leading-7 text-aw-muted"
-              />
-          </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {courseGroups.map((group) => (
-              <CourseGroupCard key={group.id} group={group} />
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* Empfohlene Kurse (manuell hervorgehoben) */}
       {featuredCourses.length > 0 && (

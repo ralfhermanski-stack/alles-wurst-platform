@@ -177,45 +177,7 @@ export function validateCourseForPublish(
     });
   }
 
-  if (input.learningPathAssignments && input.learningPathAssignments.length > 0) {
-    for (const assignment of input.learningPathAssignments) {
-      if (assignment.groupIsActive === false) {
-        issues.push({
-          path: "course.learningPathAssignments",
-          message: `Der Lernpfad „${assignment.groupName ?? "Unbekannt"}" ist inaktiv.`,
-        });
-      }
-
-      if (assignment.subgroupIsActive === false) {
-        issues.push({
-          path: "course.learningPathAssignments",
-          message: `Das Modul „${assignment.subgroupName ?? "Unbekannt"}" ist inaktiv.`,
-        });
-      }
-    }
-  } else if (!input.courseGroupId) {
-    issues.push({
-      path: "course.courseGroupId",
-      message: "Der Kurs braucht mindestens einen Lernpfad.",
-    });
-  } else if (input.groupIsActive === false) {
-    issues.push({
-      path: "course.courseGroupId",
-      message: "Der primäre Lernpfad ist inaktiv.",
-    });
-  }
-
-  if (
-    input.courseSubgroupId &&
-    (!input.learningPathAssignments || input.learningPathAssignments.length === 0)
-  ) {
-    if (input.subgroupIsActive === false) {
-      issues.push({
-        path: "course.courseSubgroupId",
-        message: "Das gewählte Modul ist inaktiv.",
-      });
-    }
-  }
+  // Lernpfade sind als Produktfeature entfernt — Zuordnungen sind optional.
 
   return issues;
 }

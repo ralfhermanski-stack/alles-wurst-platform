@@ -107,10 +107,35 @@ export default function BetaTesterTasksPanel() {
       {loading ? (
         <p className="text-sm text-aw-muted">Lädt …</p>
       ) : tasks.length === 0 ? (
-        <p className="rounded-xl border border-aw-border bg-aw-surface/40 p-5 text-sm text-aw-muted">
-          Aktuell liegen keine Aufträge vor. Du wirst per E-Mail informiert, sobald
-          neue Aufgaben für dich bereitstehen.
-        </p>
+        <div className="rounded-xl border border-dashed border-aw-border bg-aw-surface/40 p-5">
+          <p className="text-sm text-aw-muted">
+            Aktuell liegen keine Aufträge vor. Du wirst per E-Mail informiert, sobald
+            neue Aufgaben für dich bereitstehen.
+          </p>
+          <p className="mt-3 text-sm text-aw-cream">
+            Bis dahin kannst du die Plattform schon ausprobieren:
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/werkstatt"
+              className="inline-flex items-center justify-center rounded-md bg-aw-gold px-4 py-2 text-sm font-semibold text-aw-bg transition-colors hover:bg-aw-gold-dark hover:text-aw-cream"
+            >
+              Werkstatt öffnen
+            </Link>
+            <Link
+              href="/akademie/kurse"
+              className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-aw-gold ring-1 ring-aw-gold/40 transition-colors hover:bg-aw-gold hover:text-aw-bg"
+            >
+              Kurskatalog
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-aw-gold ring-1 ring-aw-gold/40 transition-colors hover:bg-aw-gold hover:text-aw-bg"
+            >
+              Startseite
+            </Link>
+          </div>
+        </div>
       ) : (
         <ul className="space-y-4">
           {tasks.map((task) => {

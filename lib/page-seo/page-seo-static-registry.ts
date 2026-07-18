@@ -25,7 +25,7 @@ const STATIC_PAGES: StaticPageDefinition[] = [
       "Lerne Wurst selber machen in strukturierten Kursen, nutze präzise Werkzeuge und werde Teil einer Community für Fleischverarbeitung und Räuchern.",
     heroText:
       "Handwerkliche Wurstherstellung – Schritt für Schritt zum Meister. Lerne in strukturierten Kursen, nutze präzise Werkzeuge und werde Teil einer Community, die das Fleischerhandwerk lebt.",
-    headings: ["Kursbereiche", "Empfohlene Kurse", "Werkstatt", "Magazin"],
+    headings: ["Empfohlene Kurse", "Werkstatt", "Magazin"],
     bodyText:
       "Alles-Wurst verbindet Akademie, Werkstatt, Magazin und Community für Wurstherstellung, Räuchern, Marinaden und handwerkliches Fleischwissen.",
     imageUrl: "/hero-werkstatt.png",
@@ -34,9 +34,9 @@ const STATIC_PAGES: StaticPageDefinition[] = [
     path: "/akademie",
     title: "Akademie",
     description:
-      "Strukturierte Lernpfade und Kurse für Wurstherstellung, Räuchern und Fleischverarbeitung.",
+      "Kurse für Wurstherstellung, Räuchern und Fleischverarbeitung — von den Grundlagen bis zur Meisterschaft.",
     bodyText:
-      "Die Alles-Wurst Akademie bietet strukturierte Lernpfade und Kurse für Wurstherstellung, Räuchern und Fleischverarbeitung.",
+      "Die Alles-Wurst Akademie bietet Kurse für Wurstherstellung, Räuchern und Fleischverarbeitung.",
   },
   {
     path: "/akademie/kurse",

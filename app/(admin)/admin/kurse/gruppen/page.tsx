@@ -1,5 +1,8 @@
-import AdminCourseGroupManager from "@/components/admin/courses/AdminCourseGroupManager";
+import { redirect } from "next/navigation";
 
+/**
+ * Admin-UI für Lernpfade entfernt — Kursverwaltung läuft über /admin/kurse.
+ */
 export default function AdminCourseGroupsPage() {
-  return <AdminCourseGroupManager />;
+  redirect("/admin/kurse");
 }

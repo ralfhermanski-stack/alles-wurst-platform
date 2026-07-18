@@ -707,7 +707,7 @@ export const PLATFORM_TEXT_DEFAULTS: PlatformTextDefault[] = [
     "akademie.header.description",
     "headings",
     "Akademie — Header Beschreibung",
-    "Unsere Lernpfade führen dich progressiv durch das Handwerk. Jeder Kurs ist in Module und Lektionen gegliedert und schließt mit einem Zertifikat ab.",
+    "Jeder Kurs ist in Module und Lektionen gegliedert und schließt mit einem Zertifikat ab. Starte im Katalog und lerne in deinem Tempo.",
   ),
   t("akademie.header.image", "headings", "Akademie — Header Bild", "/akademie-header.png"),
   t(
