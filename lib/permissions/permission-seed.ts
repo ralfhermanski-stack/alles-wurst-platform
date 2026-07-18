@@ -21,6 +21,7 @@ const REGISTERED_PERMISSIONS = [
   "tickets.own.view",
   "blog.public.view",
   "recipe.view.public",
+  "recipe.view.monthly",
   "recipe.create",
   "recipe.edit.own",
   "recipe.delete.own",
@@ -32,8 +33,11 @@ const REGISTERED_PERMISSIONS = [
   "workshop.recipe-generator.view",
   "workshop.recipe-generator.open",
   "workshop.recipe-generator.use",
+  // Seite öffnen; Inhalt bleibt stufengefiltert (nur Rezept des Monats).
   "workshop.recipe-database.view",
   "workshop.recipe-database.open",
+  "workshop.recipe-of-month.view",
+  "workshop.recipe-of-month.open",
   "workshop.own-recipes.view",
   "workshop.own-recipes.open",
   "forum.view",
@@ -51,9 +55,8 @@ const REGISTERED_PERMISSIONS = [
 const WURSTCLUB_PERMISSIONS = [
   ...REGISTERED_PERMISSIONS,
   "membership.benefits.view",
-  "recipe.view.monthly",
-  "workshop.recipe-of-month.view",
-  "workshop.recipe-of-month.open",
+  // Club-Inhalte in der Rezeptdatenbank (Ralf-Rezepte u. a.).
+  "recipe.view.premium",
   "workshop.salt-calculator.view",
   "workshop.salt-calculator.open",
   "workshop.salt-calculator.use",
@@ -61,7 +64,6 @@ const WURSTCLUB_PERMISSIONS = [
 
 const WURSTCLUB_PRO_PERMISSIONS = [
   ...WURSTCLUB_PERMISSIONS,
-  "recipe.view.premium",
   "workshop.brine-calculator.view",
   "workshop.brine-calculator.open",
   "workshop.brine-calculator.use",
