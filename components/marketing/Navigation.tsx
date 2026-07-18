@@ -71,7 +71,7 @@ export default function Navigation() {
           </Link>
         )}
         <Link
-          href="/mitgliedschaft"
+          href={isLoggedIn ? "/mitgliedschaft" : "/registrieren"}
           className="rounded-md bg-aw-gold px-4 py-2 text-sm font-semibold text-aw-bg transition-colors hover:bg-aw-gold-dark hover:text-aw-cream"
         >
           Mitglied werden
@@ -124,7 +124,7 @@ export default function Navigation() {
                 {isLoggedIn ? "Mein Bereich" : "Anmelden"}
               </Link>
               <Link
-                href="/mitgliedschaft"
+                href={isLoggedIn ? "/mitgliedschaft" : "/registrieren"}
                 onClick={() => setOpen(false)}
                 className="rounded-md bg-aw-gold px-3 py-3 text-center text-base font-semibold text-aw-bg hover:bg-aw-gold-dark hover:text-aw-cream"
               >

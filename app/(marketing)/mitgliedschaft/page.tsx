@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import PageHeader from "@/components/marketing/PageHeader";
 import MembershipCard from "@/components/cards/MembershipCard";
+import { getSessionUserIdFromCookies } from "@/lib/auth/session";
 import { getCheckoutUiProviders } from "@/lib/payments/checkout-query-service";
 import { listMembershipMarketingPlans } from "@/lib/membership/membership-marketing";
 import { buildStaticPageMetadata } from "@/lib/page-seo/page-seo-static-metadata";
@@ -31,6 +32,11 @@ const faqs = [
 ];
 
 export default async function MitgliedschaftPage() {
+  const userId = await getSessionUserIdFromCookies();
+  if (!userId) {
+    redirect("/registrieren");
+  }
+
   const [{ plans, error }, providers] = await Promise.all([
     listMembershipMarketingPlans(),
     getCheckoutUiProviders(),
@@ -70,11 +76,8 @@ export default async function MitgliedschaftPage() {
 
         <p className="mt-8 text-center text-xs text-aw-muted">
           {hasStripe
-            ? "Für den Checkout ist ein Konto erforderlich. Nach erfolgreicher Zahlung wird deine Mitgliedschaft automatisch freigeschaltet."
-            : "Stripe ist derzeit nicht konfiguriert — Buchung über Überweisung oder manuelle Freigabe."}{" "}
-          <Link href="/anmelden" className="font-semibold text-aw-gold hover:text-aw-cream">
-            Anmelden
-          </Link>
+            ? "Nach erfolgreicher Zahlung wird deine Mitgliedschaft automatisch freigeschaltet."
+            : "Stripe ist derzeit nicht konfiguriert — Buchung über Überweisung oder manuelle Freigabe."}
         </p>
       </section>
 

@@ -28,6 +28,7 @@ import {
   philosophyQuote,
 } from "@/lib/placeholder-data";
 import { getHomepageBlogPosts } from "@/lib/blog/blog-service";
+import { getSessionUserIdFromCookies } from "@/lib/auth/session";
 import { buildStaticPageMetadata } from "@/lib/page-seo/page-seo-static-metadata";
 import PageSeoJsonLd from "@/components/seo/PageSeoJsonLd";
 
@@ -42,15 +43,17 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [featuredCourses, latestBlogPosts, heroStats] = await Promise.all([
+  const [featuredCourses, latestBlogPosts, heroStats, userId] = await Promise.all([
     listFeaturedHomepageCourses(),
     getHomepageBlogPosts(3),
     getHomepageHeroStats(),
+    getSessionUserIdFromCookies(),
   ]);
   const latestCourses = await listLatestCourses(
     3,
     featuredCourses.map((course) => course.id),
   );
+  const membershipCtaHref = userId ? "/mitgliedschaft" : "/registrieren";
 
   return (
     <>
@@ -108,7 +111,7 @@ export default async function HomePage() {
               as="span"
             />
           ),
-          href: "/mitgliedschaft",
+          href: membershipCtaHref,
         }}
         secondaryCta={{
           label: (

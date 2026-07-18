@@ -115,9 +115,9 @@ export default function LoginForm() {
       </button>
 
       <p className="text-center text-sm text-aw-muted">
-        Noch kein Konto? Registrierung ist derzeit nur mit persönlicher{" "}
+        Noch kein Konto? Während der Beta ist die Registrierung nur mit{" "}
         <Link href="/registrieren" className="font-semibold text-aw-gold hover:text-aw-cream">
-          Einladung
+          Einladungslink
         </Link>{" "}
         möglich.
       </p>

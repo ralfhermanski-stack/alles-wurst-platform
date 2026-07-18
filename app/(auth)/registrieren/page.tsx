@@ -2,15 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import {
-  primaryButtonClassName,
-  secondaryButtonClassName,
-} from "@/components/tools/recipe-generator/recipe-form-classes";
+import { primaryButtonClassName } from "@/components/tools/recipe-generator/recipe-form-classes";
 
 export const metadata: Metadata = {
   title: "Registrieren",
   description:
-    "Registrierung bei Alles Wurst ist derzeit nur mit persönlicher Einladung möglich.",
+    "Registrierung bei Alles Wurst ist während der Beta nur mit persönlichem Einladungslink möglich.",
 };
 
 export default async function RegistrierenPage({
@@ -31,20 +28,19 @@ export default async function RegistrierenPage({
         Registrierung nur mit Einladung
       </h1>
       <p className="mt-3 text-sm text-aw-muted">
-        Neue Konten können derzeit nur über einen persönlichen Einladungslink
-        erstellt werden. Wenn du eine Einladung erhalten hast, öffne den Link
-        aus der E-Mail — dort kannst du dich registrieren.
+        Während der laufenden Beta können sich neue Nutzerinnen und Nutzer nur
+        über einen persönlichen Einladungslink registrieren. Ohne Einladung ist
+        derzeit keine Anmeldung als Mitglied möglich.
       </p>
       <p className="mt-3 text-sm text-aw-muted">
-        Hast du bereits ein Konto? Dann melde dich einfach an.
+        Wenn du eine Einladung erhalten hast, öffne den Link aus der E-Mail —
+        dort kannst du dein Konto erstellen. Hast du bereits ein Konto? Dann
+        melde dich einfach an.
       </p>
 
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-8">
         <Link href="/anmelden" className={`${primaryButtonClassName} text-center`}>
           Zur Anmeldung
-        </Link>
-        <Link href="/mitgliedschaft" className={`${secondaryButtonClassName} text-center`}>
-          Mehr zur Mitgliedschaft
         </Link>
       </div>
     </div>
