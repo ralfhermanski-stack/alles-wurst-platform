@@ -17,16 +17,13 @@ export default function RezeptdatenbankPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Werkstatt · Club"
-        title="Offizielle Rezeptdatenbank"
-        description="Freigegebene Meisterrezepte der Alles-Wurst Community — durchsuchbar, filterbar und direkt in deinen Rezeptgenerator kopierbar."
+        eyebrow="Werkstatt"
+        title="Rezeptdatenbank"
+        description="Rezept des Monats, Kursrezepte und Club-Inhalte — je nach Mitgliedschaft und gebuchten Kursen. Freigegebene Rezepte kannst du in deinen Rezeptgenerator kopieren."
       />
 
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
-        <div className="mb-8">
-          <MembershipRolePrototype />
-        </div>
-
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 space-y-8">
+        <MembershipRolePrototype />
         <RecipeDatabaseList />
       </section>
     </>

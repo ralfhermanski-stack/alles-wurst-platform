@@ -199,7 +199,8 @@ function canRecipeBeVisibleInDatabaseBase(args: {
 
   switch (role) {
     case "registered":
-      return false; // registered only sees monthly (handled above)
+      // Monatsrezept oben; Kursrezepte über canCourseLockedRecipeBeVisibleForUser.
+      return false;
     case "wurstclub":
       return isRalfRecipe;
     case "meisterclub":
@@ -223,31 +224,102 @@ async function canCourseLockedRecipeBeVisibleForUser(args: {
 }): Promise<boolean> {
   const { recipe, membership } = args;
 
-  // Monatsrezept hat Vorrang (immer sichtbar).
+  if (recipe.deletedAt !== null || recipe.status !== RecipeStatus.published) {
+    return false;
+  }
+
+  // Monatsrezept: für alle Stufen mit Datenbank-Lesen (Basis inkl.).
   if (recipe.isRecipeOfMonth) {
     return recipe.visibility === RecipeVisibility.database;
   }
 
-  if (!recipe.isCourseLinked) {
-    return canRecipeBeVisibleInDatabaseBase({
-      recipe,
-      role: membership.role,
-      ralfUserId: args.ralfUserId,
+  // Kursrezepte: freigeschaltet durch Kursbuchung — unabhängig von Club-Stufe.
+  if (recipe.isCourseLinked) {
+    if (!membership.userId) {
+      return false;
+    }
+
+    return isCourseLinkedRecipeUnlockedForUser({
+      recipeId: recipe.id,
+      userId: membership.userId,
     });
   }
 
-  // Kurs-locked: nur sichtbar, wenn der User Zugriff auf mindestens einen
-  // Kurs hat, in dem dieses Rezept als Lesson-Rezept genutzt wird.
-  if (!membership.userId) {
-    return false;
+  return canRecipeBeVisibleInDatabaseBase({
+    recipe,
+    role: membership.role,
+    ralfUserId: args.ralfUserId,
+  });
+}
+
+/**
+ * Filtert kursgebundene Rezepte heraus, für die der Nutzer keinen Kurszugriff hat.
+ * Monatsrezepte bleiben immer sichtbar.
+ */
+async function filterCourseLockedRecipes(
+  recipes: Recipe[],
+  userId: string | null,
+): Promise<Recipe[]> {
+  const locked = recipes.filter((r) => r.isCourseLinked && !r.isRecipeOfMonth);
+
+  if (locked.length === 0) {
+    return recipes;
   }
 
-  return (
-    canRecipeBeVisibleInDatabaseBase({
-      recipe,
-      role: membership.role,
-      ralfUserId: args.ralfUserId,
-    }) && (await isCourseLinkedRecipeUnlockedForUser({ recipeId: recipe.id, userId: membership.userId }))
+  if (!userId) {
+    return recipes.filter((r) => !r.isCourseLinked || r.isRecipeOfMonth);
+  }
+
+  const lockedIds = locked.map((r) => r.id);
+
+  const courseLessons = await prisma.courseLesson.findMany({
+    where: {
+      lessonType: "recipe",
+      recipeId: { in: lockedIds },
+    },
+    select: {
+      recipeId: true,
+      module: { select: { courseId: true } },
+    },
+  });
+
+  const courseIdsPerRecipe = new Map<string, Set<string>>();
+  for (const lesson of courseLessons) {
+    if (!lesson.recipeId) {
+      continue;
+    }
+    const set = courseIdsPerRecipe.get(lesson.recipeId) ?? new Set<string>();
+    set.add(lesson.module.courseId);
+    courseIdsPerRecipe.set(lesson.recipeId, set);
+  }
+
+  const uniqueCourseIds = new Set<string>();
+  for (const set of courseIdsPerRecipe.values()) {
+    for (const courseId of set) {
+      uniqueCourseIds.add(courseId);
+    }
+  }
+
+  const allowedCourseIds = new Map<string, boolean>();
+  for (const courseId of uniqueCourseIds) {
+    allowedCourseIds.set(courseId, await hasActiveCourseAccess(userId, courseId));
+  }
+
+  const unlockedRecipeIds = new Set<string>();
+  for (const [rid, courseIdSet] of courseIdsPerRecipe.entries()) {
+    const ok = Array.from(courseIdSet).some(
+      (cid) => allowedCourseIds.get(cid) === true,
+    );
+    if (ok) {
+      unlockedRecipeIds.add(rid);
+    }
+  }
+
+  return recipes.filter(
+    (r) =>
+      !r.isCourseLinked ||
+      r.isRecipeOfMonth ||
+      unlockedRecipeIds.has(r.id),
   );
 }
 
@@ -279,32 +351,33 @@ export async function listOfficialRecipes(
         ? await resolveRalfUserId()
         : null;
 
-    const accessOr: Prisma.RecipeWhereInput[] = [];
-
-    // Monatsrezept ist für registrierte sichtbar.
-    if (role === "registered") {
-      accessOr.push({
+    const accessOr: Prisma.RecipeWhereInput[] = [
+      // Basis: Rezept des Monats (alle registrierten Stufen).
+      {
         isRecipeOfMonth: true,
         visibility: RecipeVisibility.database,
-      });
-    } else {
-      // Höhere Stufen: Monatsrezept + (Ralf / public / special)
+      },
+    ];
+
+    // Kursrezepte: Kandidaten laden, Freigabe später per Kurszugriff filtern.
+    if (userId) {
+      accessOr.push({ isCourseLinked: true });
+    }
+
+    // Wurstclub+: Club-Inhalte (Ralf-Rezepte / Wurstclub-Rezept des Monats).
+    if (ralfUserId) {
       accessOr.push({
-        isRecipeOfMonth: true,
-        visibility: RecipeVisibility.database,
+        userId: ralfUserId,
+        visibility: {
+          in: [RecipeVisibility.database, RecipeVisibility.public],
+        },
       });
+    }
 
-      if (ralfUserId) {
-        accessOr.push({
-          userId: ralfUserId,
-          visibility: { in: [RecipeVisibility.database, RecipeVisibility.public] },
-        });
-      }
-
-      if (role === "meisterclub" || role === "admin") {
-        accessOr.push({ visibility: RecipeVisibility.public });
-        accessOr.push({ isMeisterclubSpecial: true });
-      }
+    // Meisterclub / Admin: öffentliche Nutzerrezepte + Meisterclub-Specials.
+    if (role === "meisterclub" || role === "admin") {
+      accessOr.push({ visibility: RecipeVisibility.public });
+      accessOr.push({ isMeisterclubSpecial: true });
     }
 
     const and: Prisma.RecipeWhereInput[] = [{ OR: accessOr }];
@@ -336,72 +409,7 @@ export async function listOfficialRecipes(
       orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
     });
 
-    // Kurs-locked Rezepte filtern (nur für Club-Stufen, nicht für registriert).
-    let finalRecipes = recipes;
-    if (
-      (role === "wurstclub" || role === "meisterclub" || role === "admin") &&
-      recipes.length > 0
-    ) {
-      const locked = recipes.filter(
-        (r) => r.isCourseLinked && !r.isRecipeOfMonth,
-      );
-
-      if (locked.length === 0) {
-        finalRecipes = recipes;
-      } else if (!userId) {
-        finalRecipes = recipes.filter((r) => !r.isCourseLinked || r.isRecipeOfMonth);
-      } else {
-        const lockedIds = locked.map((r) => r.id);
-
-        const courseLessons = await prisma.courseLesson.findMany({
-          where: {
-            lessonType: "recipe",
-            recipeId: { in: lockedIds },
-          },
-          select: {
-            recipeId: true,
-            module: { select: { courseId: true } },
-          },
-        });
-
-        const courseIdsPerRecipe = new Map<string, Set<string>>();
-        for (const lesson of courseLessons) {
-          if (!lesson.recipeId) {
-            continue;
-          }
-          const set = courseIdsPerRecipe.get(lesson.recipeId) ?? new Set<string>();
-          set.add(lesson.module.courseId);
-          courseIdsPerRecipe.set(lesson.recipeId, set);
-        }
-
-        const uniqueCourseIds = new Set<string>();
-        for (const set of courseIdsPerRecipe.values()) {
-          for (const courseId of set) {
-            uniqueCourseIds.add(courseId);
-          }
-        }
-
-        const allowedCourseIds = new Map<string, boolean>();
-        for (const courseId of uniqueCourseIds) {
-          allowedCourseIds.set(courseId, await hasActiveCourseAccess(userId, courseId));
-        }
-
-        const unlockedRecipeIds = new Set<string>();
-        for (const [rid, courseIdSet] of courseIdsPerRecipe.entries()) {
-          const ok = Array.from(courseIdSet).some((cid) => allowedCourseIds.get(cid) === true);
-          if (ok) {
-            unlockedRecipeIds.add(rid);
-          }
-        }
-
-        finalRecipes = recipes.filter(
-          (r) =>
-            !r.isCourseLinked ||
-            r.isRecipeOfMonth ||
-            unlockedRecipeIds.has(r.id),
-        );
-      }
-    }
+    const finalRecipes = await filterCourseLockedRecipes(recipes, userId);
 
     const summaries = finalRecipes
       .map(mapToPublicSummary)

@@ -2,11 +2,12 @@
 
 /**
  * @file MembershipRolePrototype.tsx
- * @purpose Prototyp-Umschalter für Mitgliedschaftsrollen (bis echte Auth).
+ * @purpose Admin-only Umschalter zum lokalen Testen von Mitgliedschaftsstufen.
  */
 
 import { useState, useEffect, type FormEvent } from "react";
 
+import { fetchSessionApi } from "@/lib/auth/auth-client";
 import {
   MEMBERSHIP_ROLE_DESCRIPTIONS,
   MEMBERSHIP_ROLE_LABELS,
@@ -23,21 +24,47 @@ import {
   getMembershipRole,
 } from "@/lib/membership/membership-session";
 import { useMembershipAccess } from "@/lib/membership/use-membership-access";
+import { isAdminSystemRole } from "@/lib/users/system-role";
 
 const selectClassName =
   "w-full rounded-lg border border-aw-border bg-aw-bg px-3 py-2 text-sm text-aw-cream";
 
 /**
- * Dev-/Prototyp-Panel zum Testen von Mitgliedschaftsstufen.
+ * Dev-/Prototyp-Panel — nur für Admin/Superadmin sichtbar.
+ * Normale registrierte Nutzer und Club-Mitglieder sehen dieses Panel nie.
  */
 export default function MembershipRolePrototype() {
   const membership = useMembershipAccess();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [ready, setReady] = useState(false);
   const [role, setRole] = useState<MembershipRole>(DEFAULT_MEMBERSHIP_ROLE);
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
-    setRole(getMembershipRole());
-    setBlocked(isMembershipAccessBlocked());
+    let cancelled = false;
+
+    void (async () => {
+      const session = await fetchSessionApi();
+      if (cancelled) {
+        return;
+      }
+
+      const admin =
+        session.success &&
+        session.data != null &&
+        isAdminSystemRole(session.data.systemRole);
+
+      setIsAdmin(Boolean(admin));
+      if (admin) {
+        setRole(getMembershipRole());
+        setBlocked(isMembershipAccessBlocked());
+      }
+      setReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function handleApply(event: FormEvent) {
@@ -47,17 +74,21 @@ export default function MembershipRolePrototype() {
     membership.refresh();
   }
 
+  if (!ready || !isAdmin) {
+    return null;
+  }
+
   return (
     <form
       onSubmit={handleApply}
       className="rounded-xl border border-dashed border-aw-border bg-aw-surface/40 p-4"
     >
       <p className="text-xs font-semibold uppercase tracking-wider text-aw-muted">
-        Prototyp — Mitgliedschaft simulieren
+        Admin — Mitgliedschaft simulieren
       </p>
       <p className="mt-1 text-xs text-aw-muted">
-        Bis echte Auth und Zahlung angebunden sind, wird die Rolle lokal
-        gespeichert und per API-Header mitgesendet.
+        Nur für Administratoren. Die Rolle wird lokal gespeichert und als
+        Fallback-Header mitgesendet (Session aus der Datenbank hat Vorrang).
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

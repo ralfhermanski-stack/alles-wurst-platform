@@ -22,6 +22,33 @@ import {
   type RecipeDatabaseListFilters,
 } from "@/lib/tools/recipe-client";
 import { useMembershipAccess } from "@/lib/membership/use-membership-access";
+import type { MembershipRole } from "@/lib/membership/membership-rules";
+
+function emptyStateCopy(role: MembershipRole): { title: string; hint: string } {
+  switch (role) {
+    case "registered":
+      return {
+        title: "Aktuell kein Rezept des Monats freigegeben",
+        hint: "Als registriertes Mitglied siehst du hier das Rezept des Monats sowie Rezepte aus Kursen, die du gebucht hast. Sobald etwas freigegeben ist, erscheint es an dieser Stelle.",
+      };
+    case "wurstclub":
+      return {
+        title: "Aktuell keine Club-Rezepte verfügbar",
+        hint: "Als Wurstclub-Mitglied siehst du das Rezept des Monats, Wurstclub-Inhalte und Rezepte aus gebuchten Kursen — sobald sie freigegeben sind.",
+      };
+    case "meisterclub":
+    case "admin":
+      return {
+        title: "Noch keine freigegebenen Rezepte verfügbar",
+        hint: "Offizielle und freigegebene Community-Rezepte erscheinen hier, sobald sie veröffentlicht sind.",
+      };
+    default:
+      return {
+        title: "Keine Rezepte verfügbar",
+        hint: "Melde dich an, um das Rezept des Monats und freigegebene Inhalte zu sehen.",
+      };
+  }
+}
 
 export default function RecipeDatabaseList() {
   const membership = useMembershipAccess();
@@ -81,6 +108,12 @@ export default function RecipeDatabaseList() {
 
   const showLoading = readCheck.allowed && loading;
   const visibleRecipes = readCheck.allowed ? recipes : [];
+  const emptyCopy = emptyStateCopy(membership.role);
+  const hasActiveFilters = Boolean(
+    filters.category ||
+      filters.search ||
+      (filters.recipeType && filters.recipeType !== "all"),
+  );
 
   return (
     <div>
@@ -89,64 +122,73 @@ export default function RecipeDatabaseList() {
       )}
 
       {readCheck.allowed && (
-      <form
-        className="mb-8 grid gap-4 rounded-xl border border-aw-gold/25 bg-aw-surface/60 p-5 lg:grid-cols-4"
-        onSubmit={applyFilters}
-      >
-        <div>
-          <label htmlFor="db-category" className="text-xs font-semibold uppercase text-aw-muted">
-            Kategorie
-          </label>
-          <RecipeCategorySelect
-            id="db-category"
-            className={`${selectClassName} mt-2`}
-            value={category}
-            onChange={setCategory}
-            emptyLabel="Alle Kategorien"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="db-type" className="text-xs font-semibold uppercase text-aw-muted">
-            Rezepttyp
-          </label>
-          <select
-            id="db-type"
-            className={`${selectClassName} mt-2`}
-            value={recipeType}
-            onChange={(e) =>
-              setRecipeType(e.target.value as RecipeDatabaseTypeFilter)
-            }
-          >
-            {Object.entries(RECIPE_TYPE_FILTER_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="lg:col-span-2">
-          <label htmlFor="db-search" className="text-xs font-semibold uppercase text-aw-muted">
-            Textsuche
-          </label>
-          <div className="mt-2 flex gap-2">
-            <input
-              id="db-search"
-              className={inputClassName}
-              placeholder="Name oder Beschreibung …"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="shrink-0 rounded-lg bg-aw-gold px-5 py-2.5 text-sm font-semibold text-aw-bg hover:bg-aw-cream"
+        <form
+          className="mb-8 grid gap-4 rounded-xl border border-aw-gold/25 bg-aw-surface/60 p-5 lg:grid-cols-4"
+          onSubmit={applyFilters}
+        >
+          <div>
+            <label
+              htmlFor="db-category"
+              className="text-xs font-semibold uppercase text-aw-muted"
             >
-              Filtern
-            </button>
+              Kategorie
+            </label>
+            <RecipeCategorySelect
+              id="db-category"
+              className={`${selectClassName} mt-2`}
+              value={category}
+              onChange={setCategory}
+              emptyLabel="Alle Kategorien"
+            />
           </div>
-        </div>
-      </form>
+
+          <div>
+            <label
+              htmlFor="db-type"
+              className="text-xs font-semibold uppercase text-aw-muted"
+            >
+              Rezepttyp
+            </label>
+            <select
+              id="db-type"
+              className={`${selectClassName} mt-2`}
+              value={recipeType}
+              onChange={(e) =>
+                setRecipeType(e.target.value as RecipeDatabaseTypeFilter)
+              }
+            >
+              {Object.entries(RECIPE_TYPE_FILTER_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="lg:col-span-2">
+            <label
+              htmlFor="db-search"
+              className="text-xs font-semibold uppercase text-aw-muted"
+            >
+              Textsuche
+            </label>
+            <div className="mt-2 flex gap-2">
+              <input
+                id="db-search"
+                className={inputClassName}
+                placeholder="Name oder Beschreibung …"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="shrink-0 rounded-lg bg-aw-gold px-5 py-2.5 text-sm font-semibold text-aw-bg hover:bg-aw-cream"
+              >
+                Filtern
+              </button>
+            </div>
+          </div>
+        </form>
       )}
 
       {readCheck.allowed && error && (
@@ -162,10 +204,15 @@ export default function RecipeDatabaseList() {
         <p className="text-sm text-aw-muted">Rezepte werden geladen …</p>
       ) : readCheck.allowed && visibleRecipes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-aw-border px-6 py-16 text-center">
-          <p className="text-aw-cream">Noch keine offiziellen Rezepte verfügbar.</p>
+          <p className="text-aw-cream">
+            {hasActiveFilters
+              ? "Keine Rezepte passen zu deinen Filtern."
+              : emptyCopy.title}
+          </p>
           <p className="mt-2 text-sm text-aw-muted">
-            Freigegebene Rezepte erscheinen hier nach der Admin-Übernahme in die
-            Datenbank.
+            {hasActiveFilters
+              ? "Passe Kategorie, Rezepttyp oder Suche an und versuche es erneut."
+              : emptyCopy.hint}
           </p>
         </div>
       ) : readCheck.allowed ? (
