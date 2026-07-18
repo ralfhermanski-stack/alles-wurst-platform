@@ -53,7 +53,11 @@ export async function requirePagePermission(pathname: string): Promise<void> {
 
   if (!allowed) {
     if (pathname.startsWith("/admin")) {
-      redirect("/mein-bereich?error=forbidden");
+      redirect("/?error=forbidden");
+    }
+
+    if (pathname.startsWith("/mein-bereich") || pathname.startsWith("/account")) {
+      redirect("/?error=forbidden");
     }
 
     redirect("/werkstatt?error=forbidden");

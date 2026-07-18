@@ -309,7 +309,11 @@ export async function middleware(request: NextRequest) {
     );
 
     if (!hasAccess) {
-      return NextResponse.redirect(new URL("/mein-bereich?error=forbidden", request.url));
+      // Nie zurück auf /mein-bereich leiten — sonst Redirect-Schleife,
+      // wenn general.member-area.view fehlt.
+      return NextResponse.redirect(
+        new URL("/?error=forbidden", request.url),
+      );
     }
   }
 

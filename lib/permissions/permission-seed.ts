@@ -375,6 +375,9 @@ export async function migrateExistingUsersToGroups(): Promise<{
       slugs.push("registered", "wurstclub", "wurstclub-pro", "meisterclub");
     } else if (membershipRole === "accounting") {
       slugs.push("accounting");
+    } else if (systemRole === "USER") {
+      // Registrierte Nutzer ohne Club-Rolle / ohne Membership → Basisgruppe
+      slugs.push("registered");
     }
 
     for (const slug of slugs) {
@@ -460,14 +463,46 @@ export async function syncMembershipGroupForUser(userId: string): Promise<void> 
     where: { linkedMembershipRole: { not: null } },
   });
 
-  const active =
+  const membershipRole = user.membership?.role ?? null;
+  const accessBlocked = user.membership?.accessBlocked === true;
+  const paidActive =
     user.membership?.status === "active" &&
-    !user.membership.accessBlocked &&
+    !accessBlocked &&
     (!user.membership.endsAt || user.membership.endsAt.getTime() > Date.now());
 
+  /** Welche membership-verknüpften Gruppen der Nutzer haben soll. */
+  const desiredRoles = new Set<MembershipRole>();
+
+  if (!accessBlocked) {
+    if (membershipRole === "registered") {
+      // Basis-Registrierung: status ist typischerweise "none", kein Paid-Status nötig.
+      desiredRoles.add("registered");
+    } else if (membershipRole === "wurstclub") {
+      desiredRoles.add("registered");
+      if (paidActive) {
+        desiredRoles.add("wurstclub");
+      }
+    } else if (membershipRole === "meisterclub") {
+      desiredRoles.add("registered");
+      if (paidActive) {
+        desiredRoles.add("wurstclub");
+        desiredRoles.add("meisterclub");
+      }
+    } else if (membershipRole === "accounting") {
+      desiredRoles.add("accounting");
+    } else if (user.systemRole === "USER") {
+      // Fallback: normale Nutzer ohne Membership-Eintrag bekommen Basisrechte.
+      desiredRoles.add("registered");
+    }
+  }
+
   for (const group of membershipGroups) {
-    const shouldHave =
-      active && group.linkedMembershipRole === user.membership?.role;
+    const linkedRole = group.linkedMembershipRole;
+    if (!linkedRole) {
+      continue;
+    }
+
+    const shouldHave = desiredRoles.has(linkedRole);
 
     if (shouldHave) {
       await prisma.userGroupMember.upsert({
@@ -479,6 +514,33 @@ export async function syncMembershipGroupForUser(userId: string): Promise<void> 
       await prisma.userGroupMember.deleteMany({
         where: {
           groupId: group.id,
+          userId,
+          isManual: false,
+        },
+      });
+    }
+  }
+
+  // Meisterclub erbt zusätzlich die manuelle Pro-Gruppe (wie beim Seed-Migrate).
+  const proGroup = await prisma.userGroup.findUnique({
+    where: { slug: "wurstclub-pro" },
+    select: { id: true },
+  });
+
+  if (proGroup) {
+    const shouldHavePro =
+      !accessBlocked && membershipRole === "meisterclub" && paidActive;
+
+    if (shouldHavePro) {
+      await prisma.userGroupMember.upsert({
+        where: { groupId_userId: { groupId: proGroup.id, userId } },
+        create: { groupId: proGroup.id, userId, isManual: false },
+        update: {},
+      });
+    } else {
+      await prisma.userGroupMember.deleteMany({
+        where: {
+          groupId: proGroup.id,
           userId,
           isManual: false,
         },

@@ -232,6 +232,11 @@ export async function createUserWithProfile(
       include: userWithRelationsInclude,
     });
 
+    const { syncMembershipGroupForUser } = await import(
+      "@/lib/permissions/permission-seed"
+    );
+    await syncMembershipGroupForUser(user.id);
+
     return userSuccess(toUserSummary(user));
   } catch {
     return userFailure({
