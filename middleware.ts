@@ -26,6 +26,7 @@ import {
 } from "@/lib/page-editor/preview-token-constants";
 import { applyPageEditorPreviewCookie } from "@/lib/page-editor/preview-cookie";
 import { verifyPageEditorPreviewToken } from "@/lib/page-editor/preview-token-edge";
+import { resolveInternalApiUrl } from "@/lib/http/internal-api-url";
 import { findRoutePermission } from "@/lib/permissions/route-permissions";
 import { getSecurityHeaders } from "@/lib/security/security-headers";
 
@@ -50,7 +51,8 @@ async function hasRouteAccess(
     : "/api/account/permissions";
 
   try {
-    const url = new URL(apiPath, request.url);
+    // Wie Maintenance-Probe: nie über öffentliche HTTPS-URL self-fetchen.
+    const url = resolveInternalApiUrl(apiPath, request);
     const response = await fetch(url, {
       headers: { cookie: request.headers.get("cookie") ?? "" },
       cache: "no-store",
@@ -124,7 +126,7 @@ async function hasAdminAreaAccess(
   }
 
   try {
-    const url = new URL("/api/admin/permissions/session", request.url);
+    const url = resolveInternalApiUrl("/api/admin/permissions/session", request);
     const response = await fetch(url, {
       headers: { cookie: request.headers.get("cookie") ?? "" },
       cache: "no-store",
@@ -296,27 +298,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (
-    routePermission &&
-    session &&
-    (pathname.startsWith("/mein-bereich") || pathname.startsWith("/account"))
-  ) {
-    const hasAccess = await hasRouteAccess(
-      request,
-      session,
-      routePermission.permissionKey,
-      false,
-    );
-
-    if (!hasAccess) {
-      // Nie zurück auf /mein-bereich leiten — sonst Redirect-Schleife,
-      // wenn general.member-area.view fehlt.
-      return NextResponse.redirect(
-        new URL("/?error=forbidden", request.url),
-      );
-    }
-  }
-
+  // Mitgliederbereich: Middleware prüft nur Login.
+  // Rechte (general.member-area.view etc.) prüft das Member-Layout per DB —
+  // kein Self-Fetch, der in Produktion fehlschlagen und fälschlich forbidden liefern kann.
   if (pathname.startsWith("/mein-bereich") || pathname.startsWith("/account")) {
     if (!session) {
       const loginUrl = new URL("/anmelden", request.url);

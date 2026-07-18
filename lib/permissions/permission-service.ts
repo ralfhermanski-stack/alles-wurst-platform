@@ -60,6 +60,37 @@ function isActiveMembership(membership: {
   return true;
 }
 
+/**
+ * Rolle für Permission-Auflösung (linkedMembershipRole).
+ * Registrierte Nutzer haben typischerweise status "none" — trotzdem Basisrechte.
+ */
+function resolveContextMembershipRole(membership: {
+  role: MembershipRole;
+  status: string;
+  accessBlocked: boolean;
+  endsAt: Date | null;
+  extendedUntil: Date | null;
+} | null): MembershipRole | null {
+  if (!membership || membership.accessBlocked) {
+    return null;
+  }
+
+  if (membership.role === "registered") {
+    return "registered";
+  }
+
+  if (isActiveMembership(membership)) {
+    return membership.role;
+  }
+
+  // Abgelaufene Club-Mitgliedschaft: weiterhin registrierte Basisrechte.
+  if (membership.role === "wurstclub" || membership.role === "meisterclub") {
+    return "registered";
+  }
+
+  return null;
+}
+
 async function loadUserContext(userId: string): Promise<UserPermissionContext | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -85,12 +116,10 @@ async function loadUserContext(userId: string): Promise<UserPermissionContext | 
     return null;
   }
 
-  const membershipActive = isActiveMembership(user.membership);
-
   return {
     userId: user.id,
     systemRole: user.systemRole,
-    membershipRole: membershipActive ? user.membership?.role ?? null : null,
+    membershipRole: resolveContextMembershipRole(user.membership),
     maintenanceBypass: user.maintenanceBypass,
   };
 }

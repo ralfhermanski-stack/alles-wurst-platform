@@ -8,18 +8,8 @@
 
 import type { NextRequest } from "next/server";
 
+import { resolveInternalApiUrl } from "@/lib/http/internal-api-url";
+
 export function resolveMaintenanceStatusProbeUrl(request: NextRequest): URL {
-  const configured = process.env.MAINTENANCE_PROBE_URL?.trim();
-
-  if (configured) {
-    return new URL("/api/maintenance/status", configured);
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    return new URL("/api/maintenance/status", request.url);
-  }
-
-  const port = process.env.PORT?.trim() || "3000";
-
-  return new URL(`/api/maintenance/status`, `http://127.0.0.1:${port}`);
+  return resolveInternalApiUrl("/api/maintenance/status", request);
 }
