@@ -1,3 +1,4 @@
+import Markdown from "@/components/ui/Markdown";
 import type { ForumAuthorEntry } from "@/lib/forums/forum-types";
 
 import ForumAuthor from "./ForumAuthor";
@@ -16,6 +17,7 @@ function formatDate(iso: string): string {
 
 /**
  * Klassischer Forenbeitrag: schmale Autorenspalte links, Inhalt rechts.
+ * Body als sicheres Markdown (Plain-Text bleibt lesbar).
  */
 export default function ForumPost({
   author,
@@ -37,9 +39,7 @@ export default function ForumPost({
           >
             {formatDate(createdAt)}
           </time>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-aw-cream">
-            {body}
-          </p>
+          <Markdown content={body} variant="forum" />
           {forumSignature ? <ForumPostSignature html={forumSignature} /> : null}
         </div>
       </div>

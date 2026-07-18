@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 
-import {
-  inputClassName,
-  primaryButtonClassName,
-} from "@/components/tools/recipe-generator/recipe-form-classes";
+import ForumMarkdownEditor from "@/components/forums/ForumMarkdownEditor";
+import { primaryButtonClassName } from "@/components/tools/recipe-generator/recipe-form-classes";
 
 type ForumComposerProps = {
   placeholder: string;
@@ -44,12 +42,11 @@ export default function ForumComposer({
 
   return (
     <div className="rounded-lg border border-aw-border bg-aw-surface/30 p-3">
-      <textarea
-        className={`${inputClassName} min-h-20 w-full text-sm`}
-        placeholder={placeholder}
+      <ForumMarkdownEditor
         value={body}
-        onChange={(event) => setBody(event.target.value)}
-        rows={4}
+        onChange={setBody}
+        placeholder={placeholder}
+        disabled={saving}
       />
       {error && (
         <p className="mt-1.5 text-sm text-aw-warning" role="alert">

@@ -11,35 +11,118 @@
  *   - Zeilenumbrüche (einfacher Umbruch innerhalb eines Absatzes)
  *   - Listen         (-, * bzw. 1. )
  *   - fett (**text**) und kursiv (*text* / _text_)
+ *   - Links          ([Text](https://…)) — nur http/https
+ *   - Smilies        (:) :D …) — nur bei variant="forum"
  */
 
 import type { ReactNode } from "react";
 
+import {
+  buildSmileyPattern,
+  replaceForumSmilies,
+} from "@/lib/forums/forum-smilies";
 import { slugifyHeading } from "@/lib/content/rich-body-utils";
 
-const INLINE_PATTERN = /(\*\*([^*]+)\*\*|\*([^*\n]+)\*|_([^_\n]+)_)/g;
+const INLINE_PATTERN =
+  /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*|_([^_\n]+)_)/g;
 
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+const SMILEY_PATTERN = buildSmileyPattern();
+
+function renderPlainSegment(
+  text: string,
+  keyPrefix: string,
+  enableSmilies: boolean,
+): ReactNode[] {
+  if (!text) {
+    return [];
+  }
+
+  if (!enableSmilies) {
+    return [text];
+  }
+
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let matchIndex = 0;
+  SMILEY_PATTERN.lastIndex = 0;
 
-  for (const match of text.matchAll(INLINE_PATTERN)) {
+  for (const match of text.matchAll(SMILEY_PATTERN)) {
     const start = match.index ?? 0;
 
     if (start > lastIndex) {
       nodes.push(text.slice(lastIndex, start));
     }
 
-    if (match[2] !== undefined) {
+    nodes.push(
+      <span key={`${keyPrefix}-s-${matchIndex}`} aria-hidden="true">
+        {replaceForumSmilies(match[0])}
+      </span>,
+    );
+
+    lastIndex = start + match[0].length;
+    matchIndex += 1;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes.length > 0 ? nodes : [text];
+}
+
+function renderInline(
+  text: string,
+  keyPrefix: string,
+  enableSmilies: boolean,
+): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let matchIndex = 0;
+  INLINE_PATTERN.lastIndex = 0;
+
+  for (const match of text.matchAll(INLINE_PATTERN)) {
+    const start = match.index ?? 0;
+
+    if (start > lastIndex) {
       nodes.push(
-        <strong key={`${keyPrefix}-b-${matchIndex}`} className="font-semibold text-aw-cream">
-          {match[2]}
+        ...renderPlainSegment(
+          text.slice(lastIndex, start),
+          `${keyPrefix}-t-${matchIndex}`,
+          enableSmilies,
+        ),
+      );
+    }
+
+    if (match[2] !== undefined && match[3] !== undefined) {
+      nodes.push(
+        <a
+          key={`${keyPrefix}-a-${matchIndex}`}
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-aw-gold underline decoration-aw-gold/40 underline-offset-2 hover:decoration-aw-gold"
+        >
+          {renderInline(match[2], `${keyPrefix}-al-${matchIndex}`, enableSmilies)}
+        </a>,
+      );
+    } else if (match[4] !== undefined) {
+      nodes.push(
+        <strong
+          key={`${keyPrefix}-b-${matchIndex}`}
+          className="font-semibold text-aw-cream"
+        >
+          {renderInline(match[4], `${keyPrefix}-bi-${matchIndex}`, enableSmilies)}
         </strong>,
       );
-    } else if (match[3] !== undefined || match[4] !== undefined) {
+    } else if (match[5] !== undefined || match[6] !== undefined) {
       nodes.push(
-        <em key={`${keyPrefix}-i-${matchIndex}`}>{match[3] ?? match[4]}</em>,
+        <em key={`${keyPrefix}-i-${matchIndex}`}>
+          {renderInline(
+            match[5] ?? match[6] ?? "",
+            `${keyPrefix}-em-${matchIndex}`,
+            enableSmilies,
+          )}
+        </em>,
       );
     }
 
@@ -48,7 +131,13 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   }
 
   if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
+    nodes.push(
+      ...renderPlainSegment(
+        text.slice(lastIndex),
+        `${keyPrefix}-t-end`,
+        enableSmilies,
+      ),
+    );
   }
 
   return nodes;
@@ -59,6 +148,7 @@ function renderParagraph(
   key: string,
   variant: MarkdownVariant,
 ): ReactNode {
+  const enableSmilies = variant === "forum";
   const content: ReactNode[] = [];
 
   lines.forEach((line, index) => {
@@ -66,13 +156,15 @@ function renderParagraph(
       content.push(<br key={`${key}-br-${index}`} />);
     }
 
-    content.push(...renderInline(line, `${key}-l-${index}`));
+    content.push(...renderInline(line, `${key}-l-${index}`, enableSmilies));
   });
 
   const paragraphClass =
     variant === "sales"
       ? "text-lg leading-[1.75] text-aw-cream/85"
-      : "text-sm leading-7 text-aw-muted";
+      : variant === "forum"
+        ? "text-sm leading-relaxed text-aw-cream"
+        : "text-sm leading-7 text-aw-muted";
 
   return (
     <p key={key} className={paragraphClass}>
@@ -81,7 +173,7 @@ function renderParagraph(
   );
 }
 
-type MarkdownVariant = "default" | "sales";
+type MarkdownVariant = "default" | "sales" | "forum";
 
 const HEADING_PATTERN = /^(#{1,3})\s+(.*)$/;
 const UL_PATTERN = /^\s*[-*]\s+(.*)$/;
@@ -90,6 +182,7 @@ const OL_PATTERN = /^\s*\d+\.\s+(.*)$/;
 function parseBlocks(markdown: string, variant: MarkdownVariant): ReactNode[] {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
+  const enableSmilies = variant === "forum";
 
   let paragraph: string[] = [];
   let blockIndex = 0;
@@ -131,15 +224,15 @@ function parseBlocks(markdown: string, variant: MarkdownVariant): ReactNode[] {
       blocks.push(
         level === 1 ? (
           <h3 key={key} id={headingId || undefined} className={className}>
-            {renderInline(text, key)}
+            {renderInline(text, key, enableSmilies)}
           </h3>
         ) : level === 2 ? (
           <h4 key={key} id={headingId || undefined} className={className}>
-            {renderInline(text, key)}
+            {renderInline(text, key, enableSmilies)}
           </h4>
         ) : (
           <h5 key={key} id={headingId || undefined} className={className}>
-            {renderInline(text, key)}
+            {renderInline(text, key, enableSmilies)}
           </h5>
         ),
       );
@@ -167,11 +260,15 @@ function parseBlocks(markdown: string, variant: MarkdownVariant): ReactNode[] {
       const listClass =
         variant === "sales"
           ? "mt-3 list-disc space-y-2 pl-5 text-lg leading-[1.75] text-aw-cream/85"
-          : "mt-2 list-disc space-y-1 pl-5 text-sm leading-7 text-aw-muted";
+          : variant === "forum"
+            ? "mt-1 list-disc space-y-0.5 pl-5 text-sm leading-relaxed text-aw-cream"
+            : "mt-2 list-disc space-y-1 pl-5 text-sm leading-7 text-aw-muted";
       blocks.push(
         <ul key={key} className={listClass}>
           {items.map((item, index) => (
-            <li key={`${key}-${index}`}>{renderInline(item, `${key}-${index}`)}</li>
+            <li key={`${key}-${index}`}>
+              {renderInline(item, `${key}-${index}`, enableSmilies)}
+            </li>
           ))}
         </ul>,
       );
@@ -198,11 +295,15 @@ function parseBlocks(markdown: string, variant: MarkdownVariant): ReactNode[] {
       const olClass =
         variant === "sales"
           ? "mt-3 list-decimal space-y-2 pl-5 text-lg leading-[1.75] text-aw-cream/85"
-          : "mt-2 list-decimal space-y-1 pl-5 text-sm leading-7 text-aw-muted";
+          : variant === "forum"
+            ? "mt-1 list-decimal space-y-0.5 pl-5 text-sm leading-relaxed text-aw-cream"
+            : "mt-2 list-decimal space-y-1 pl-5 text-sm leading-7 text-aw-muted";
       blocks.push(
         <ol key={key} className={olClass}>
           {items.map((item, index) => (
-            <li key={`${key}-${index}`}>{renderInline(item, `${key}-${index}`)}</li>
+            <li key={`${key}-${index}`}>
+              {renderInline(item, `${key}-${index}`, enableSmilies)}
+            </li>
           ))}
         </ol>,
       );
@@ -238,7 +339,8 @@ export default function Markdown({
     return null;
   }
 
-  const spacing = variant === "sales" ? "space-y-6" : "space-y-3";
+  const spacing =
+    variant === "sales" ? "space-y-6" : variant === "forum" ? "space-y-2" : "space-y-3";
 
   return (
     <div className={`${spacing} ${className ?? ""}`}>

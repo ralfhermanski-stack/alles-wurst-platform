@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import ForumMarkdownEditor from "@/components/forums/ForumMarkdownEditor";
 import ForumRulesAcceptanceModal from "@/components/forums/ForumRulesAcceptanceModal";
 import ForumThreadList from "@/components/forums/ForumThreadList";
 import type { ForumThreadEntry } from "@/lib/forums/forum-types";
@@ -114,7 +115,7 @@ export default function MemberForumPage({
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-10">
         <h1 className="font-display text-2xl font-bold text-aw-cream">
           Seite nicht gefunden
         </h1>
@@ -133,7 +134,7 @@ export default function MemberForumPage({
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       {rules.status && forum.canWrite && (
         <ForumRulesAcceptanceModal
           open={rules.needsAcceptance}
@@ -185,13 +186,13 @@ export default function MemberForumPage({
                   placeholder="Titel"
                   value={newTitle}
                   onChange={(event) => setNewTitle(event.target.value)}
+                  disabled={creating}
                 />
-                <textarea
-                  className={`${inputClassName} min-h-20 w-full text-sm`}
-                  placeholder="Dein Beitrag …"
+                <ForumMarkdownEditor
                   value={newBody}
-                  onChange={(event) => setNewBody(event.target.value)}
-                  rows={4}
+                  onChange={setNewBody}
+                  placeholder="Dein Beitrag …"
+                  disabled={creating}
                 />
                 <button
                   type="button"

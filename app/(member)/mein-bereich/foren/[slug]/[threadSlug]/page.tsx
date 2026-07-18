@@ -83,7 +83,7 @@ export default function MemberForumThreadPage({
 
   if (error) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="font-display text-2xl font-bold text-aw-cream">
           Seite nicht gefunden
         </h1>
@@ -107,7 +107,7 @@ export default function MemberForumThreadPage({
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       {rules.status && thread.canWrite && (
         <ForumRulesAcceptanceModal
           open={rules.needsAcceptance}

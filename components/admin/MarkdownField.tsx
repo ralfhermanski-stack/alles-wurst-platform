@@ -150,7 +150,8 @@ export default function MarkdownField({
             onBlur={onBlur}
           />
           <p className="mt-1 text-xs text-aw-muted">
-            Markdown: **fett**, *kursiv*, ## Überschrift, - Liste, [Link](https://…)
+            Markdown: **fett**, *kursiv*, ## Überschrift, - Liste,
+            [Link](https://…)
           </p>
         </>
       )}
