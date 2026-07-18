@@ -12,7 +12,13 @@ type ForumThreadListProps = {
 };
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE");
+  return new Date(iso).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function ForumThreadList({
@@ -21,35 +27,36 @@ export default function ForumThreadList({
 }: ForumThreadListProps) {
   if (threads.length === 0) {
     return (
-      <p className="rounded-xl border border-aw-border bg-aw-surface/30 p-4 text-sm text-aw-muted">
+      <p className="border border-aw-border bg-aw-surface/30 px-3 py-3 text-sm text-aw-muted">
         Noch keine Themen vorhanden.
       </p>
     );
   }
 
   return (
-    <ul className="divide-y divide-aw-border rounded-xl border border-aw-border">
+    <ul className="divide-y divide-aw-border overflow-hidden rounded-lg border border-aw-border">
       {threads.map((thread) => (
         <li key={thread.id}>
           <Link
             href={`/mein-bereich/foren/${forumSlug}/${thread.slug}`}
-            className="block px-4 py-4 hover:bg-aw-surface/40"
+            className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-3 py-2.5 hover:bg-aw-surface/40 sm:grid-cols-[minmax(0,1fr)_7rem_9rem]"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-aw-cream">{thread.title}</p>
-                <p className="mt-1 line-clamp-2 text-sm text-aw-muted">
-                  {thread.body}
-                </p>
-              </div>
-              <div className="text-right text-xs text-aw-muted">
-                <p>{thread.replyCount} Antworten</p>
-                <p className="mt-1">{formatDate(thread.createdAt)}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-aw-cream">
+                {thread.title}
+              </p>
+              <div className="mt-0.5">
+                <ForumAuthor author={thread.author} size="sm" />
               </div>
             </div>
-            <div className="mt-3">
-              <ForumAuthor author={thread.author} />
-            </div>
+            <p className="text-right text-xs tabular-nums text-aw-muted sm:text-center">
+              {thread.replyCount}{" "}
+              <span className="hidden sm:inline">Antworten</span>
+              <span className="sm:hidden">Antw.</span>
+            </p>
+            <p className="col-span-2 text-right text-[11px] text-aw-muted sm:col-span-1 sm:text-right">
+              {formatDate(thread.updatedAt)}
+            </p>
           </Link>
         </li>
       ))}

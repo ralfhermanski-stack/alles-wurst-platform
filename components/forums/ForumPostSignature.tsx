@@ -6,13 +6,10 @@ type ForumPostSignatureProps = {
 
 export default function ForumPostSignature({ html }: ForumPostSignatureProps) {
   return (
-    <aside className="mt-4 border-t border-aw-border/60 pt-3">
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-aw-muted">
-        Signatur
-      </p>
+    <aside className="mt-3 border-t border-aw-border/50 pt-2">
       <RichTextContent
         content={html}
-        className="text-sm leading-relaxed text-aw-muted"
+        className="text-xs leading-relaxed text-aw-muted"
       />
     </aside>
   );

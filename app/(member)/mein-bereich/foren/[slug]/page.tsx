@@ -133,7 +133,7 @@ export default function MemberForumPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       {rules.status && forum.canWrite && (
         <ForumRulesAcceptanceModal
           open={rules.needsAcceptance}
@@ -154,26 +154,24 @@ export default function MemberForumPage({
         </Link>
       )}
 
-      <h1 className="mt-4 font-display text-3xl font-bold text-aw-cream">
+      <h1 className="mt-3 font-display text-2xl font-bold text-aw-cream sm:text-3xl">
         {forum.title}
       </h1>
 
       {forum.description && (
-        <p className="mt-4 text-sm leading-relaxed text-aw-muted">
+        <p className="mt-2 text-sm leading-relaxed text-aw-muted">
           {forum.description}
         </p>
       )}
 
-      <div className="mt-8 space-y-6">
+      <div className="mt-5 space-y-4">
         <ForumThreadList forumSlug={slug} threads={threads} />
 
         {forum.canWrite && (
-          <section className="rounded-xl border border-aw-border bg-aw-surface/40 p-5">
-            <h2 className="font-display text-lg font-bold text-aw-cream">
-              Neues Thema
-            </h2>
+          <section className="rounded-lg border border-aw-border bg-aw-surface/30 p-3">
+            <h2 className="text-sm font-semibold text-aw-cream">Neues Thema</h2>
             {rules.needsAcceptance ? (
-              <p className="mt-4 text-sm text-aw-muted">
+              <p className="mt-2 text-sm text-aw-muted">
                 Bitte akzeptiere zuerst die Forenregeln im Dialog, um ein Thema
                 zu erstellen.{" "}
                 <Link href="/forenregeln" className="text-aw-gold underline">
@@ -181,7 +179,7 @@ export default function MemberForumPage({
                 </Link>
               </p>
             ) : (
-              <div className="mt-4 space-y-3">
+              <div className="mt-2 space-y-2">
                 <input
                   className={inputClassName}
                   placeholder="Titel"
@@ -189,10 +187,11 @@ export default function MemberForumPage({
                   onChange={(event) => setNewTitle(event.target.value)}
                 />
                 <textarea
-                  className={`${inputClassName} min-h-28 w-full`}
+                  className={`${inputClassName} min-h-20 w-full text-sm`}
                   placeholder="Dein Beitrag …"
                   value={newBody}
                   onChange={(event) => setNewBody(event.target.value)}
+                  rows={4}
                 />
                 <button
                   type="button"

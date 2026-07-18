@@ -15,18 +15,18 @@ export default async function MemberForumsPage() {
   const { forums, activity } = await getCommunityOverview(userId);
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-8">
+    <>
+      <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
         <Link
           href="/mein-bereich"
           className="text-sm text-aw-gold hover:underline"
         >
           ← Zurück zu Mein Bereich
         </Link>
-        <h1 className="mt-4 font-display text-3xl font-bold text-aw-cream">
+        <h1 className="mt-3 font-display text-2xl font-bold text-aw-cream sm:text-3xl">
           Foren
         </h1>
-        <p className="mt-2 text-sm text-aw-muted">
+        <p className="mt-1.5 text-sm text-aw-muted">
           Tausche dich mit der Community aus. Vor dem ersten Beitrag musst du
           die{" "}
           <Link href="/forenregeln" className="text-aw-gold underline">
@@ -37,6 +37,6 @@ export default async function MemberForumsPage() {
       </div>
 
       <CommunityOverview forums={forums} activity={activity} />
-    </section>
+    </>
   );
 }

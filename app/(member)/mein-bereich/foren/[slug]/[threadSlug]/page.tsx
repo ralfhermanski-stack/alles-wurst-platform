@@ -3,16 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import ForumAuthor from "@/components/forums/ForumAuthor";
 import ForumComposer from "@/components/forums/ForumComposer";
-import ForumPostSignature from "@/components/forums/ForumPostSignature";
+import ForumPost from "@/components/forums/ForumPost";
 import ForumRulesAcceptanceModal from "@/components/forums/ForumRulesAcceptanceModal";
 import type { ForumThreadDetail } from "@/lib/forums/forum-types";
 import { useForumRulesAcceptance } from "@/lib/forums/use-forum-rules-acceptance";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("de-DE");
-}
 
 export default function MemberForumThreadPage({
   params,
@@ -88,7 +83,7 @@ export default function MemberForumThreadPage({
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         <h1 className="font-display text-2xl font-bold text-aw-cream">
           Seite nicht gefunden
         </h1>
@@ -112,7 +107,7 @@ export default function MemberForumThreadPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       {rules.status && thread.canWrite && (
         <ForumRulesAcceptanceModal
           open={rules.needsAcceptance}
@@ -131,53 +126,37 @@ export default function MemberForumThreadPage({
         ← Zurück zum Forum
       </Link>
 
-      <article className="mt-4 rounded-xl border border-aw-border bg-aw-surface/40 p-5">
-        <h1 className="font-display text-2xl font-bold text-aw-cream">
+      <header className="mt-3 border-b border-aw-border pb-3">
+        <h1 className="font-display text-xl font-bold leading-snug text-aw-cream sm:text-2xl">
           {thread.title}
         </h1>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <ForumAuthor author={thread.author} size="md" />
-          <time className="text-xs text-aw-muted">
-            {formatDate(thread.createdAt)}
-          </time>
-        </div>
-        <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-aw-cream">
-          {thread.body}
+        <p className="mt-1 text-xs text-aw-muted">
+          {thread.posts.length} Antwort{thread.posts.length === 1 ? "" : "en"}
         </p>
-        {thread.forumSignature && (
-          <ForumPostSignature html={thread.forumSignature} />
-        )}
-      </article>
+      </header>
 
-      <section className="mt-8 space-y-4">
-        <h2 className="font-display text-lg font-bold text-aw-cream">
-          Antworten ({thread.posts.length})
-        </h2>
+      <div className="mt-3 overflow-hidden rounded-lg border border-aw-border bg-aw-bg/20">
+        <ForumPost
+          author={thread.author}
+          body={thread.body}
+          createdAt={thread.createdAt}
+          forumSignature={thread.forumSignature}
+        />
 
         {thread.posts.map((post) => (
-          <article
+          <ForumPost
             key={post.id}
-            className="rounded-xl border border-aw-border bg-aw-bg/40 p-4"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <ForumAuthor author={post.author} size="md" />
-              <time className="text-xs text-aw-muted">
-                {formatDate(post.createdAt)}
-              </time>
-            </div>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-aw-cream">
-              {post.body}
-            </p>
-            {post.forumSignature && (
-              <ForumPostSignature html={post.forumSignature} />
-            )}
-          </article>
+            author={post.author}
+            body={post.body}
+            createdAt={post.createdAt}
+            forumSignature={post.forumSignature}
+          />
         ))}
-      </section>
+      </div>
 
       {thread.canWrite && (
-        <section className="mt-8">
-          <h2 className="mb-3 font-display text-lg font-bold text-aw-cream">
+        <section className="mt-5">
+          <h2 className="mb-2 text-sm font-semibold text-aw-cream">
             Antwort schreiben
           </h2>
           {rules.needsAcceptance ? (

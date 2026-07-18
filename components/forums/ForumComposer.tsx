@@ -43,21 +43,22 @@ export default function ForumComposer({
   }
 
   return (
-    <div className="rounded-xl border border-aw-border bg-aw-surface/40 p-4">
+    <div className="rounded-lg border border-aw-border bg-aw-surface/30 p-3">
       <textarea
-        className={`${inputClassName} min-h-28 w-full`}
+        className={`${inputClassName} min-h-20 w-full text-sm`}
         placeholder={placeholder}
         value={body}
         onChange={(event) => setBody(event.target.value)}
+        rows={4}
       />
       {error && (
-        <p className="mt-2 text-sm text-aw-warning" role="alert">
+        <p className="mt-1.5 text-sm text-aw-warning" role="alert">
           {error}
         </p>
       )}
       <button
         type="button"
-        className={`${primaryButtonClassName} mt-3`}
+        className={`${primaryButtonClassName} mt-2`}
         disabled={saving || !body.trim()}
         onClick={() => void handleSubmit()}
       >
