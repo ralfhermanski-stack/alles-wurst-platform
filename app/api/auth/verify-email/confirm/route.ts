@@ -5,6 +5,7 @@ import {
   jsonFromAuthResult,
   parseJsonBody,
 } from "@/lib/auth/auth-api-utils";
+import { getSessionUser } from "@/lib/auth/auth-service";
 import { setSessionCookie } from "@/lib/auth/session";
 import { userFailure } from "@/lib/users/user-errors";
 
@@ -30,7 +31,18 @@ export async function POST(request: Request): Promise<Response> {
     return jsonFromAuthResult(result);
   }
 
-  await setSessionCookie(result.data.userId);
+  const sessionUser = await getSessionUser(result.data.userId);
+
+  if (sessionUser.success && sessionUser.data) {
+    await setSessionCookie(
+      sessionUser.data.id,
+      sessionUser.data.systemRole,
+      sessionUser.data.maintenanceBypass,
+      request,
+    );
+  } else {
+    await setSessionCookie(result.data.userId, "USER", false, request);
+  }
 
   return jsonAuthSuccess({
     message: result.data.message,

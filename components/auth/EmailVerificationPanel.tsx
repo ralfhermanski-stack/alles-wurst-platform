@@ -12,6 +12,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import DevActionLinkHint from "@/components/auth/DevActionLinkHint";
 import {
   confirmEmailVerificationApi,
+  fetchSessionApi,
   requestEmailVerificationApi,
 } from "@/lib/auth/auth-client";
 import {
@@ -19,6 +20,7 @@ import {
   labelClassName,
   primaryButtonClassName,
 } from "@/components/tools/recipe-generator/recipe-form-classes";
+import { setRecipeUserId } from "@/lib/tools/recipe-session";
 
 type PanelState = "idle" | "confirming" | "confirmed" | "requesting";
 
@@ -63,6 +65,13 @@ export default function EmailVerificationPanel() {
 
       setMessage(response.data.message);
       setState("confirmed");
+
+      // Session inkl. Wartungs-Bypass neu laden, damit Startseite erreichbar ist.
+      const session = await fetchSessionApi();
+      if (session.success && session.data) {
+        setRecipeUserId(session.data.id);
+      }
+
       router.refresh();
     }
 

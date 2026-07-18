@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -81,6 +82,20 @@ export default function BetaTesterTasksPanel() {
         <p className="mt-3 text-sm text-aw-cream">
           Offen: <strong>{openCount}</strong> · Gesamt: <strong>{tasks.length}</strong>
         </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-md bg-aw-gold px-4 py-2 text-sm font-semibold text-aw-bg transition-colors hover:bg-aw-gold-dark hover:text-aw-cream"
+          >
+            Zur Startseite
+          </Link>
+          <Link
+            href="/mein-bereich"
+            className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-aw-gold ring-1 ring-aw-gold/40 transition-colors hover:bg-aw-gold hover:text-aw-bg"
+          >
+            Zum Mein-Bereich
+          </Link>
+        </div>
       </div>
 
       {error && (
