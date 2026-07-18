@@ -36,6 +36,10 @@ import {
 import type { CourseImportPayload } from "./course-import-types";
 import { getCourseCheckoutTarget } from "./course-catalog-service";
 import {
+  isValidLessonExternalUrl,
+  normalizeLessonExternalUrl,
+} from "./course-lesson-url";
+import {
   archiveCourseProduct,
   getCourseSalesProductStatus,
   syncCourseProduct,
@@ -230,6 +234,8 @@ export type CreateLessonInput = {
   recipeId?: string | null;
   recipeTitle?: string | null;
   recipeContent?: Record<string, unknown> | null;
+  externalUrl?: string | null;
+  externalUrlLabel?: string | null;
   /** Setzt den Kurs-Abschlussnachweis bei Lektionstyp „certificate“. */
   certificateProofType?: CertificateProofType;
 };
@@ -734,6 +740,8 @@ export async function duplicateCourse(
               recipeId: lesson.recipeId,
               recipeTitle: lesson.recipeTitle,
               recipeContent: lesson.recipeContent ?? Prisma.JsonNull,
+              externalUrl: lesson.externalUrl,
+              externalUrlLabel: lesson.externalUrlLabel,
             },
           });
         }
@@ -838,6 +846,8 @@ export async function importCourseFromJson(
               recipeContent: lesson.recipeContent
                 ? (lesson.recipeContent as Prisma.InputJsonValue)
                 : Prisma.JsonNull,
+              externalUrl: normalizeLessonExternalUrl(lesson.externalUrl),
+              externalUrlLabel: lesson.externalUrlLabel?.trim() || null,
             },
           });
         }
@@ -1148,6 +1158,13 @@ export async function createCourseLesson(
       _max: { sortOrder: true },
     });
 
+    if (!isValidLessonExternalUrl(input.externalUrl)) {
+      return userFailure({
+        code: "VALIDATION_ERROR",
+        message: "Der Ressourcen-Link muss mit http:// oder https:// beginnen.",
+      });
+    }
+
     await prisma.courseLesson.create({
       data: {
         moduleId,
@@ -1164,6 +1181,8 @@ export async function createCourseLesson(
         recipeContent: input.recipeContent
           ? (input.recipeContent as Prisma.InputJsonValue)
           : Prisma.JsonNull,
+        externalUrl: normalizeLessonExternalUrl(input.externalUrl),
+        externalUrlLabel: input.externalUrlLabel?.trim() || null,
       },
     });
 
@@ -1210,6 +1229,16 @@ export async function updateCourseLesson(
   input: UpdateLessonInput,
 ): Promise<UserServiceResult<CourseDetail>> {
   try {
+    if (
+      input.externalUrl !== undefined &&
+      !isValidLessonExternalUrl(input.externalUrl)
+    ) {
+      return userFailure({
+        code: "VALIDATION_ERROR",
+        message: "Der Ressourcen-Link muss mit http:// oder https:// beginnen.",
+      });
+    }
+
     const lesson = await prisma.courseLesson.update({
       where: { id: lessonId },
       data: {
@@ -1240,6 +1269,14 @@ export async function updateCourseLesson(
             ? input.recipeContent
               ? (input.recipeContent as Prisma.InputJsonValue)
               : Prisma.JsonNull
+            : undefined,
+        externalUrl:
+          input.externalUrl !== undefined
+            ? normalizeLessonExternalUrl(input.externalUrl)
+            : undefined,
+        externalUrlLabel:
+          input.externalUrlLabel !== undefined
+            ? input.externalUrlLabel?.trim() || null
             : undefined,
         downloadStorageKey: input.downloadStorageKey,
         downloadFileName: input.downloadFileName,

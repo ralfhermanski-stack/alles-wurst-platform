@@ -54,6 +54,8 @@ export async function PATCH(
       typeof body.recipeContent === "object" && body.recipeContent !== null
         ? (body.recipeContent as Record<string, unknown>)
         : undefined,
+    externalUrl: getNullableStringField(body, "externalUrl"),
+    externalUrlLabel: getNullableStringField(body, "externalUrlLabel"),
     certificateProofType:
       body.certificateProofType === "participation" ||
       body.certificateProofType === "achievement"

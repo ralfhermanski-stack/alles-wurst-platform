@@ -92,6 +92,26 @@ function LessonCard({ lesson }: { lesson: AdminLessonEntry }) {
               Zertifikat-Lektion (nach Kursabschluss verfügbar).
             </p>
           )}
+
+          {lesson.description && (
+            <div className="mt-3 border-t border-aw-border pt-3">
+              <p className="mb-1 text-xs uppercase tracking-wide text-aw-muted">
+                Beschreibung
+              </p>
+              <Markdown content={lesson.description} />
+            </div>
+          )}
+
+          {lesson.externalUrl && (
+            <a
+              href={lesson.externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+            >
+              {lesson.externalUrlLabel || lesson.externalUrl}
+            </a>
+          )}
         </div>
       )}
     </li>

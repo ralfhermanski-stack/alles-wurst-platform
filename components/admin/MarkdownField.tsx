@@ -57,6 +57,13 @@ const TOOLBAR: ToolbarAction[] = [
       return { text: lines.map((line, index) => `${index + 1}. ${line}`).join("\n") };
     },
   },
+  {
+    label: "URL",
+    title: "Link",
+    apply: (selected) => ({
+      text: `[${selected || "Linktext"}](https://)`,
+    }),
+  },
 ];
 
 export default function MarkdownField({
@@ -143,7 +150,7 @@ export default function MarkdownField({
             onBlur={onBlur}
           />
           <p className="mt-1 text-xs text-aw-muted">
-            Markdown: **fett**, *kursiv*, ## Überschrift, - Liste
+            Markdown: **fett**, *kursiv*, ## Überschrift, - Liste, [Link](https://…)
           </p>
         </>
       )}

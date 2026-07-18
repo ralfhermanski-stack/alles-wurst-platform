@@ -64,6 +64,8 @@ export type AdminLessonEntry = CourseLessonEntry & {
   downloadFileName: string | null;
   recipeTitle: string | null;
   recipeContent: Record<string, unknown> | null;
+  externalUrl: string | null;
+  externalUrlLabel: string | null;
 };
 
 export type CourseModuleEntry = {
@@ -129,6 +131,8 @@ export type LessonDetail = CourseLessonEntry & {
   recipeTitle: string | null;
   recipeContent: Record<string, unknown> | null;
   vimeoEmbedUrl: string | null;
+  externalUrl: string | null;
+  externalUrlLabel: string | null;
   completed: boolean;
   canAccessCertificate: boolean;
   certificateId: string | null;
@@ -223,6 +227,8 @@ export function toAdminLessonEntry(lesson: CourseLesson): AdminLessonEntry {
       lesson.recipeContent && typeof lesson.recipeContent === "object"
         ? (lesson.recipeContent as Record<string, unknown>)
         : null,
+    externalUrl: lesson.externalUrl,
+    externalUrlLabel: lesson.externalUrlLabel,
   };
 }
 

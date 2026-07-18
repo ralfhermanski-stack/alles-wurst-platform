@@ -1437,6 +1437,11 @@ model CourseLesson {
 
   textContent String? @db.Text @map("text_content")
 
+  /// Optionaler Ressourcen-Link (https://…), z. B. zu Shop, PDF oder Website
+  externalUrl String? @map("external_url") @db.Text
+  /// Anzeigetext für den Ressourcen-Link
+  externalUrlLabel String? @map("external_url_label")
+
   /// Nur Vimeo-Video-ID (kein direkter URL-Leak)
   vimeoVideoId String? @map("vimeo_video_id")
 

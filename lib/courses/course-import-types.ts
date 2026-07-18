@@ -20,6 +20,8 @@ export type CourseImportLesson = {
   vimeoVideoId?: string | null;
   recipeTitle?: string | null;
   recipeContent?: Record<string, unknown> | null;
+  externalUrl?: string | null;
+  externalUrlLabel?: string | null;
 };
 
 export type CourseImportModule = {
@@ -98,6 +100,12 @@ function parseImportLesson(value: unknown): CourseImportLesson | null {
     recipeTitle:
       typeof value.recipeTitle === "string" ? value.recipeTitle : null,
     recipeContent: isRecord(value.recipeContent) ? value.recipeContent : null,
+    externalUrl:
+      typeof value.externalUrl === "string" ? value.externalUrl : null,
+    externalUrlLabel:
+      typeof value.externalUrlLabel === "string"
+        ? value.externalUrlLabel
+        : null,
   };
 }
 

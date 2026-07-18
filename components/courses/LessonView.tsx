@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import VimeoPlayer from "@/components/courses/VimeoPlayer";
+import Markdown from "@/components/ui/Markdown";
 import {
   fetchLessonApi,
   updateLessonProgressApi,
@@ -81,18 +82,20 @@ export default function LessonView({ courseSlug, lessonSlug }: LessonViewProps) 
         {lesson.title}
       </h1>
 
+      {lesson.description && (
+        <div className="mt-4 text-sm leading-7 text-aw-muted">
+          <Markdown content={lesson.description} />
+        </div>
+      )}
+
       <div className="mt-8 space-y-6">
         {lesson.lessonType === "video" && lesson.vimeoEmbedUrl && (
           <VimeoPlayer embedUrl={lesson.vimeoEmbedUrl} title={lesson.title} />
         )}
 
         {lesson.lessonType === "text" && lesson.textContent && (
-          <div className="prose prose-invert max-w-none rounded-xl border border-aw-border bg-aw-surface/40 p-6 text-sm leading-7 text-aw-cream">
-            {lesson.textContent.split("\n").map((paragraph) => (
-              <p key={paragraph} className="mb-4">
-                {paragraph}
-              </p>
-            ))}
+          <div className="rounded-xl border border-aw-border bg-aw-surface/40 p-6">
+            <Markdown content={lesson.textContent} />
           </div>
         )}
 
@@ -153,6 +156,31 @@ export default function LessonView({ courseSlug, lessonSlug }: LessonViewProps) 
                 </div>
               )}
           </div>
+        )}
+
+        {lesson.externalUrl && (
+          <a
+            href={lesson.externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border border-aw-gold/40 bg-aw-gold/10 px-4 py-2.5 text-sm font-semibold text-aw-gold transition-colors hover:bg-aw-gold hover:text-aw-bg"
+          >
+            {lesson.externalUrlLabel?.trim() || "Weiterführender Link"}
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
         )}
 
         {lesson.lessonType === "certificate" && !lesson.completed && (

@@ -59,6 +59,8 @@ export async function POST(
       typeof body.recipeContent === "object" && body.recipeContent !== null
         ? (body.recipeContent as Record<string, unknown>)
         : null,
+    externalUrl: getNullableStringField(body, "externalUrl"),
+    externalUrlLabel: getNullableStringField(body, "externalUrlLabel"),
     certificateProofType:
       body.certificateProofType === "participation" ||
       body.certificateProofType === "achievement"

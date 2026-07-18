@@ -105,6 +105,8 @@ export async function getLessonForUser(
       vimeoEmbedUrl: lesson.lesson.vimeoVideoId
         ? buildVimeoEmbedUrl(lesson.lesson.vimeoVideoId)
         : null,
+      externalUrl: lesson.lesson.externalUrl,
+      externalUrlLabel: lesson.lesson.externalUrlLabel,
       completed: lessonProgress?.completed ?? false,
       canAccessCertificate,
       certificateId: userCertificate?.id ?? null,

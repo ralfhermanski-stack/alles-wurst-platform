@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import AdminConfirmDialog from "@/components/admin/courses/AdminConfirmDialog";
+import MarkdownField from "@/components/admin/MarkdownField";
 import {
   createLessonApi,
   createModuleApi,
@@ -109,10 +110,13 @@ type ModuleEditDraft = {
 type LessonEditDraft = {
   title: string;
   lessonType: AdminLessonTypeOption;
+  description: string;
   vimeoVideoId: string;
   textContent: string;
   recipeTitle: string;
   recipeContent: string;
+  externalUrl: string;
+  externalUrlLabel: string;
   certificateProofType: CertificateProofType;
 };
 
@@ -258,12 +262,15 @@ export default function AdminCourseModulesPanel({
     setLessonDraft({
       title: lesson.title,
       lessonType: lessonTypeOptionFromLesson(lesson, course.certificateType),
+      description: lesson.description ?? "",
       vimeoVideoId: lesson.vimeoVideoId ?? "",
       textContent: lesson.textContent ?? "",
       recipeTitle: lesson.recipeTitle ?? "",
       recipeContent: lesson.recipeContent
         ? JSON.stringify(lesson.recipeContent, null, 2)
         : "",
+      externalUrl: lesson.externalUrl ?? "",
+      externalUrlLabel: lesson.externalUrlLabel ?? "",
       certificateProofType:
         course.certificateType === "achievement" ||
         course.certificateType === "masterclass"
@@ -301,10 +308,13 @@ export default function AdminCourseModulesPanel({
     const response = await updateLessonApi(courseId, moduleId, lessonId, {
       title: lessonDraft.title.trim(),
       lessonType: parsed.lessonType,
+      description: lessonDraft.description.trim() || null,
       vimeoVideoId: lessonDraft.vimeoVideoId.trim() || null,
       textContent: lessonDraft.textContent.trim() || null,
       recipeTitle: lessonDraft.recipeTitle.trim() || null,
       recipeContent: parsed.lessonType === "recipe" ? recipeContent : null,
+      externalUrl: lessonDraft.externalUrl.trim() || null,
+      externalUrlLabel: lessonDraft.externalUrlLabel.trim() || null,
       certificateProofType:
         parsed.lessonType === "certificate"
           ? parsed.certificateProofType ?? lessonDraft.certificateProofType
@@ -500,21 +510,68 @@ export default function AdminCourseModulesPanel({
               />
             </div>
           )}
+          <MarkdownField
+            id={`lesson-description-${lesson.id}`}
+            label="Beschreibung"
+            value={lessonDraft.description}
+            onChange={(value) =>
+              setLessonDraft({ ...lessonDraft, description: value })
+            }
+            helpText="Formatierter Einleitungstext unter dem Titel (für alle Lektionstypen)."
+            minHeight="min-h-24"
+          />
           {parsed.lessonType === "text" && (
+            <MarkdownField
+              id={`lesson-text-${lesson.id}`}
+              label="Textinhalt"
+              value={lessonDraft.textContent}
+              onChange={(value) =>
+                setLessonDraft({ ...lessonDraft, textContent: value })
+              }
+              helpText="Hauptinhalt der Textlektion mit Formatierung und Links."
+              minHeight="min-h-40"
+            />
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs text-aw-muted">Textinhalt</label>
-              <textarea
-                className={`${inputClassName} mt-1 min-h-32`}
-                value={lessonDraft.textContent}
+              <label className="text-xs text-aw-muted" htmlFor={`lesson-url-${lesson.id}`}>
+                Ressourcen-Link (URL)
+              </label>
+              <input
+                id={`lesson-url-${lesson.id}`}
+                type="url"
+                className={`${inputClassName} mt-1`}
+                placeholder="https://…"
+                value={lessonDraft.externalUrl}
                 onChange={(e) =>
                   setLessonDraft({
                     ...lessonDraft,
-                    textContent: e.target.value,
+                    externalUrl: e.target.value,
                   })
                 }
               />
             </div>
-          )}
+            <div>
+              <label
+                className="text-xs text-aw-muted"
+                htmlFor={`lesson-url-label-${lesson.id}`}
+              >
+                Link-Beschriftung
+              </label>
+              <input
+                id={`lesson-url-label-${lesson.id}`}
+                className={`${inputClassName} mt-1`}
+                placeholder="z. B. Zum Shop / Weiterlesen"
+                value={lessonDraft.externalUrlLabel}
+                onChange={(e) =>
+                  setLessonDraft({
+                    ...lessonDraft,
+                    externalUrlLabel: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </div>
           {parsed.lessonType === "download" && (
             <div>
               {lesson.downloadFileName && (
@@ -624,6 +681,11 @@ export default function AdminCourseModulesPanel({
         {lesson.lessonType === "text" && lesson.textContent && (
           <p className="mt-2 line-clamp-3 text-xs text-aw-muted">
             {lesson.textContent}
+          </p>
+        )}
+        {lesson.externalUrl && (
+          <p className="mt-2 truncate text-xs text-aw-gold">
+            Link: {lesson.externalUrlLabel || lesson.externalUrl}
           </p>
         )}
         {lesson.lessonType === "download" && lesson.downloadFileName && (
