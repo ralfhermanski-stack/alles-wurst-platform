@@ -113,12 +113,20 @@ export default function EmailVerificationPanel() {
         >
           {message}
         </p>
-        <Link
-          href="/mein-bereich"
-          className={`${primaryButtonClassName} inline-flex w-full justify-center`}
-        >
-          Zum Mein-Bereich
-        </Link>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/"
+            className={`${primaryButtonClassName} inline-flex w-full justify-center`}
+          >
+            Zur Startseite
+          </Link>
+          <Link
+            href="/mein-bereich"
+            className="inline-flex w-full items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-aw-gold ring-1 ring-aw-gold/40 transition-colors hover:bg-aw-gold hover:text-aw-bg"
+          >
+            Zum Mein-Bereich
+          </Link>
+        </div>
       </div>
     );
   }

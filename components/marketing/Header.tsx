@@ -1,5 +1,7 @@
 import Logo from "@/components/brand/Logo";
 import Navigation from "@/components/marketing/Navigation";
+import EmailVerificationBanner from "@/components/auth/EmailVerificationBanner";
+import { Suspense } from "react";
 
 /**
  * Sticky-Header für den öffentlichen Bereich.
@@ -8,6 +10,9 @@ import Navigation from "@/components/marketing/Navigation";
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-aw-border/80 bg-aw-bg/90 backdrop-blur">
+      <Suspense fallback={null}>
+        <EmailVerificationBanner />
+      </Suspense>
       <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Logo priority />
         <Navigation />

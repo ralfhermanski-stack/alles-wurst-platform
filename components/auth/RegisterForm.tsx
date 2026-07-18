@@ -6,7 +6,6 @@
  */
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { registerApi } from "@/lib/auth/auth-client";
@@ -30,8 +29,6 @@ export default function RegisterForm({
   inviteToken?: string;
   emailReadOnly?: boolean;
 }) {
-  const router = useRouter();
-
   const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -101,7 +98,11 @@ export default function RegisterForm({
     }
 
     setRecipeUserId(response.data.user.id);
-    const target = inviteToken ? "/mein-bereich/betatest" : "/mein-bereich";
+    // Nach Registrierung auf die Startseite: Banner weist auf E-Mail-Bestätigung hin,
+    // Nutzer (inkl. Beta) können sich parallel schon umsehen.
+    const target = inviteToken
+      ? "/?verifyEmail=1&beta=1"
+      : "/?verifyEmail=1";
     window.location.assign(target);
   }
 
