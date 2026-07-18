@@ -98,24 +98,31 @@ export async function registerUser(
     });
   }
 
-  const passwordHash = await hashPassword(input.password);
+  const inviteToken = input.inviteToken?.trim();
 
-  if (input.inviteToken) {
-    const { verifyInviteTokenForRegistration } = await import(
-      "@/lib/beta-test/beta-test-service"
-    );
-    const inviteCheck = await verifyInviteTokenForRegistration(
-      input.inviteToken,
-      input.email,
-    );
-
-    if (!inviteCheck.ok) {
-      return userFailure({
-        code: "VALIDATION_ERROR",
-        message: inviteCheck.message ?? "Einladung ungültig.",
-      });
-    }
+  if (!inviteToken) {
+    return userFailure({
+      code: "VALIDATION_ERROR",
+      message: "Registrierung nur mit gültiger Einladung möglich.",
+    });
   }
+
+  const { verifyInviteTokenForRegistration } = await import(
+    "@/lib/beta-test/beta-test-service"
+  );
+  const inviteCheck = await verifyInviteTokenForRegistration(
+    inviteToken,
+    input.email,
+  );
+
+  if (!inviteCheck.ok) {
+    return userFailure({
+      code: "VALIDATION_ERROR",
+      message: inviteCheck.message ?? "Einladung ungültig.",
+    });
+  }
+
+  const passwordHash = await hashPassword(input.password);
 
   const createResult = await createUserWithProfile({
     email: input.email,
@@ -146,32 +153,30 @@ export async function registerUser(
     });
   }
 
-  if (input.inviteToken) {
-    const { acceptBetaInviteAfterRegistration } = await import(
-      "@/lib/beta-test/beta-test-service"
-    );
+  const { acceptBetaInviteAfterRegistration } = await import(
+    "@/lib/beta-test/beta-test-service"
+  );
 
-    try {
-      await acceptBetaInviteAfterRegistration({
-        token: input.inviteToken,
-        userId: userResult.data.id,
-        email: userResult.data.email,
-      });
-    } catch (error) {
-      return userFailure({
-        code: "VALIDATION_ERROR",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Einladung konnte nicht angenommen werden.",
-      });
-    }
+  try {
+    await acceptBetaInviteAfterRegistration({
+      token: inviteToken,
+      userId: userResult.data.id,
+      email: userResult.data.email,
+    });
+  } catch (error) {
+    return userFailure({
+      code: "VALIDATION_ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Einladung konnte nicht angenommen werden.",
+    });
+  }
 
-    const refreshed = await findUserById(userResult.data.id);
+  const refreshed = await findUserById(userResult.data.id);
 
-    if (refreshed.success && refreshed.data) {
-      return userSuccess(toAuthSessionUser(refreshed.data));
-    }
+  if (refreshed.success && refreshed.data) {
+    return userSuccess(toAuthSessionUser(refreshed.data));
   }
 
   return userSuccess(toAuthSessionUser(userResult.data));

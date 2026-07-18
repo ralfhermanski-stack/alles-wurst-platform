@@ -124,13 +124,6 @@ export default function Navigation() {
                 {isLoggedIn ? "Mein Bereich" : "Anmelden"}
               </Link>
               <Link
-                href="/registrieren"
-                onClick={() => setOpen(false)}
-                className="rounded-md px-3 py-3 text-center text-base font-medium text-aw-cream/90 ring-1 ring-aw-border hover:bg-aw-surface-2"
-              >
-                Registrieren
-              </Link>
-              <Link
                 href="/mitgliedschaft"
                 onClick={() => setOpen(false)}
                 className="rounded-md bg-aw-gold px-3 py-3 text-center text-base font-semibold text-aw-bg hover:bg-aw-gold-dark hover:text-aw-cream"

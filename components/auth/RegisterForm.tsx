@@ -58,6 +58,11 @@ export default function RegisterForm({
     event.preventDefault();
     setError(null);
 
+    if (!inviteToken?.trim()) {
+      setError("Registrierung nur mit gültiger Einladung möglich.");
+      return;
+    }
+
     if (password !== passwordConfirm) {
       setError("Die Passwörter stimmen nicht überein.");
       return;
@@ -98,11 +103,7 @@ export default function RegisterForm({
     }
 
     setRecipeUserId(response.data.user.id);
-    // Beta-Tester: direkt zu den Aufträgen; sonst Startseite mit Verify-Banner.
-    const target = inviteToken
-      ? "/mein-bereich/betatest?verifyEmail=1"
-      : "/?verifyEmail=1";
-    window.location.assign(target);
+    window.location.assign("/mein-bereich/betatest?verifyEmail=1");
   }
 
   return (

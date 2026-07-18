@@ -845,7 +845,7 @@ export const PLATFORM_TEXT_DEFAULTS: PlatformTextDefault[] = [
   t("auth.login.loading", "auth", "Login — Ladehinweis", "Formular wird geladen …"),
   t("auth.login.forgot_password", "auth", "Login — Passwort vergessen", "Passwort vergessen?"),
   t("auth.login.no_account", "auth", "Login — Kein Konto", "Noch kein Konto?"),
-  t("auth.login.register_link", "auth", "Login — Registrieren-Link", "Jetzt registrieren"),
+  t("auth.login.register_link", "auth", "Login — Registrieren-Link", "Einladung"),
 
   // Auth — Register
   t("auth.register.title", "auth", "Registrierung — Überschrift", "Registrieren"),
