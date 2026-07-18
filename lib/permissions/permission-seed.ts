@@ -32,6 +32,8 @@ const REGISTERED_PERMISSIONS = [
   "workshop.recipe-generator.view",
   "workshop.recipe-generator.open",
   "workshop.recipe-generator.use",
+  "workshop.recipe-database.view",
+  "workshop.recipe-database.open",
   "workshop.own-recipes.view",
   "workshop.own-recipes.open",
   "forum.view",
@@ -60,8 +62,6 @@ const WURSTCLUB_PERMISSIONS = [
 const WURSTCLUB_PRO_PERMISSIONS = [
   ...WURSTCLUB_PERMISSIONS,
   "recipe.view.premium",
-  "workshop.recipe-database.view",
-  "workshop.recipe-database.open",
   "workshop.brine-calculator.view",
   "workshop.brine-calculator.open",
   "workshop.brine-calculator.use",
