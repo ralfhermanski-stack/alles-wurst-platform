@@ -449,6 +449,35 @@ export async function seedPermissionSystem(): Promise<{
   return { permissions, groups, routes, migration };
 }
 
+/**
+ * Stellt sicher, dass ein Nutzer die Basis-Mitgliedschaft „registered“ hat
+ * und die zugehörige Rechtegruppe synchron ist (z. B. Beta-Bypass).
+ * Bestehende Club-/Staff-Rollen werden nicht herabgestuft.
+ */
+export async function ensureRegisteredBasisForUser(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { membership: true },
+  });
+
+  if (!user) {
+    return;
+  }
+
+  if (!user.membership) {
+    await prisma.membership.create({
+      data: {
+        userId,
+        role: "registered",
+        status: "none",
+        paymentStatus: "none",
+      },
+    });
+  }
+
+  await syncMembershipGroupForUser(userId);
+}
+
 export async function syncMembershipGroupForUser(userId: string): Promise<void> {
   const user = await prisma.user.findUnique({
     where: { id: userId },

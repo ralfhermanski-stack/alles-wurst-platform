@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import PageHeader from "@/components/marketing/PageHeader";
 import CourseCatalogCard from "@/components/courses/CourseCatalogCard";
+import CourseGroupCard from "@/components/courses/CourseGroupCard";
+import { listPublicCourseGroups } from "@/lib/course-groups/course-group-service";
 import { listPublishedCourses } from "@/lib/courses/course-catalog-service";
 import { buildStaticPageMetadata } from "@/lib/page-seo/page-seo-static-metadata";
 
@@ -16,7 +18,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function KursePage() {
-  const courses = await listPublishedCourses();
+  const [groups, courses] = await Promise.all([
+    listPublicCourseGroups({ withPublishedCoursesOnly: true }),
+    listPublishedCourses(),
+  ]);
 
   return (
     <>
@@ -25,6 +30,22 @@ export default async function KursePage() {
         title="Kurskatalog"
         description="Alle kostenpflichtigen Kurse — Minikurse und Zertifikatskurse."
       />
+
+      {groups.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 pt-12 sm:px-6">
+          <h2 className="font-display text-2xl font-bold text-aw-cream">
+            Gruppen
+          </h2>
+          <p className="mt-2 text-sm text-aw-muted">
+            Nach Themen finden — wähle eine Gruppe mit veröffentlichten Kursen.
+          </p>
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {groups.map((group) => (
+              <CourseGroupCard key={group.id} group={group} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <h2 className="font-display text-2xl font-bold text-aw-cream">

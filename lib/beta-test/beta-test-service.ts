@@ -341,6 +341,12 @@ async function applyBetaAccessForUser(userId: string, inviteId: string): Promise
       },
     }),
   ]);
+
+  // Beta-Tester erhalten dieselben Basisrechte wie registrierte Nutzer.
+  const { ensureRegisteredBasisForUser } = await import(
+    "@/lib/permissions/permission-seed"
+  );
+  await ensureRegisteredBasisForUser(userId);
 }
 
 export async function resendBetaInvite(inviteId: string): Promise<void> {
@@ -484,6 +490,11 @@ export async function addTasksToBetaUser(input: {
       data: { maintenanceBypass: true },
     });
   }
+
+  const { ensureRegisteredBasisForUser } = await import(
+    "@/lib/permissions/permission-seed"
+  );
+  await ensureRegisteredBasisForUser(input.userId);
 
   return created.map((task) => ({
     id: task.id,

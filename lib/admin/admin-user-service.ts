@@ -534,6 +534,13 @@ export async function updateAdminUserMaintenanceBypass(
     data: { maintenanceBypass },
   });
 
+  if (maintenanceBypass) {
+    const { ensureRegisteredBasisForUser } = await import(
+      "@/lib/permissions/permission-seed"
+    );
+    await ensureRegisteredBasisForUser(userId);
+  }
+
   await createAdminAuditLog({
     targetUserId: userId,
     actorUserId,

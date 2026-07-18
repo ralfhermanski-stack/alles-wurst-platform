@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import Icon from "@/components/brand/Icon";
+import CourseGroupLinks from "@/components/courses/CourseGroupLinks";
 import {
   COURSE_TYPE_LABELS,
   formatCoursePrice,
@@ -61,6 +62,12 @@ export default function CourseCatalogCard({ course }: { course: CourseSummary })
         <h3 className="font-display text-lg font-bold text-aw-cream">
           {course.title}
         </h3>
+
+        <CourseGroupLinks
+          group={course.group}
+          subgroup={course.subgroup}
+          className="mt-2"
+        />
 
         {course.shortDescription && (
           <p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-aw-muted">

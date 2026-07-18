@@ -177,7 +177,8 @@ export function validateCourseForPublish(
     });
   }
 
-  // Lernpfade sind als Produktfeature entfernt — Zuordnungen sind optional.
+  // Gruppen-Zuordnungen sind optional (nachträglich zuweisbar ohne Offline).
+  // Primäre Gruppe verbessert die Auffindbarkeit im Katalog.
 
   return issues;
 }

@@ -157,7 +157,9 @@ export async function listCourseSubgroups(options?: {
   return subgroups.map(mapSubgroup);
 }
 
-export async function listPublicCourseGroups(): Promise<PublicCourseGroupCard[]> {
+export async function listPublicCourseGroups(options?: {
+  withPublishedCoursesOnly?: boolean;
+}): Promise<PublicCourseGroupCard[]> {
   const groups = await prisma.courseGroup.findMany({
     where: { isActive: true },
     include: {
@@ -177,7 +179,7 @@ export async function listPublicCourseGroups(): Promise<PublicCourseGroupCard[]>
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 
-  return groups.map((group) => ({
+  const mapped = groups.map((group) => ({
     id: group.id,
     name: group.name,
     slug: group.slug,
@@ -197,6 +199,12 @@ export async function listPublicCourseGroups(): Promise<PublicCourseGroupCard[]>
       sortOrder: subgroup.sortOrder,
     })),
   }));
+
+  if (options?.withPublishedCoursesOnly) {
+    return mapped.filter((group) => group.courseCount > 0);
+  }
+
+  return mapped;
 }
 
 export async function getCourseGroupBySlug(
