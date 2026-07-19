@@ -63,10 +63,11 @@ export async function getHomepageSocialCards(): Promise<HomepageSocialCard[]> {
               thumbnailUrl:
                 post.localThumbnailUrl ?? post.thumbnailUrl ?? channel.coverImageUrl,
             }))
-          : tags.map((tag) => ({
-              label: tag,
-              thumbnailUrl: channel.coverImageUrl,
-            }));
+          : [];
+
+      const hasMediaPreviews =
+        Boolean(channel.coverImageUrl) ||
+        previewItems.some((item) => Boolean(item.thumbnailUrl));
 
       const linkUrl = channel.ctaUrl ?? channel.profileUrl ?? "#";
       const showFollowers =
@@ -88,6 +89,7 @@ export async function getHomepageSocialCards(): Promise<HomepageSocialCard[]> {
         showFollowerCount: showFollowers,
         coverImageUrl: channel.coverImageUrl,
         tags,
+        hasMediaPreviews,
         previewItems: previewItems.slice(0, 3),
         accent: PLATFORM_ACCENTS[channel.platform],
         ctaLabel: channel.ctaLabel ?? "Profil öffnen",

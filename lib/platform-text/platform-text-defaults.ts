@@ -539,7 +539,7 @@ export const PLATFORM_TEXT_DEFAULTS: PlatformTextDefault[] = [
     "homepage.social.subtitle",
     "headings",
     "Startseite — Social Untertitel",
-    "Folge uns auf Social Media und nimm an der monatlichen Wurst-Challenge teil.",
+    "Folge uns auf Social Media für Inspiration aus der Werkstatt.",
   ),
   t("homepage.social.follow", "headings", "Startseite — Social Follower", "Abonnenten"),
   t("homepage.social.openProfile", "buttons", "Startseite — Social Profil", "Profil öffnen"),

@@ -5,10 +5,20 @@ import SocialPlatformCardView from "./SocialPlatformCardView";
 
 type SocialPlatformCardProps = {
   platform: HomepageSocialCard;
+  variant?: "card" | "spotlight";
 };
 
-export default async function SocialPlatformCard({ platform }: SocialPlatformCardProps) {
+export default async function SocialPlatformCard({
+  platform,
+  variant = "card",
+}: SocialPlatformCardProps) {
   const followerLabel = await getPlatformText("homepage.social.follow", "Abonnenten");
 
-  return <SocialPlatformCardView platform={platform} followerLabel={followerLabel} />;
+  return (
+    <SocialPlatformCardView
+      platform={platform}
+      followerLabel={followerLabel}
+      variant={variant}
+    />
+  );
 }

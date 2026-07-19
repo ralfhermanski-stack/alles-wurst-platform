@@ -10,17 +10,26 @@ import type { HomepageSocialCard } from "@/lib/social-media/social-media-types";
 
 type PreviewMode = "desktop" | "tablet" | "mobile";
 
-const MODE_WIDTH: Record<PreviewMode, string> = {
-  desktop: "max-w-6xl",
-  tablet: "max-w-3xl",
-  mobile: "max-w-sm",
-};
-
-const MODE_GRID: Record<PreviewMode, string> = {
-  desktop: "sm:grid-cols-2 xl:grid-cols-4",
-  tablet: "sm:grid-cols-2",
-  mobile: "grid-cols-1",
-};
+function previewLayoutClass(mode: PreviewMode, count: number): string {
+  if (count <= 1) {
+    return mode === "mobile" ? "max-w-sm" : "max-w-3xl";
+  }
+  if (mode === "mobile") {
+    return "grid max-w-sm grid-cols-1 gap-6";
+  }
+  if (count === 2) {
+    return "grid max-w-3xl gap-6 sm:grid-cols-2";
+  }
+  if (count === 3) {
+    return mode === "tablet"
+      ? "grid max-w-3xl gap-6 sm:grid-cols-2"
+      : "grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3";
+  }
+  if (mode === "tablet") {
+    return "grid max-w-3xl gap-6 sm:grid-cols-2";
+  }
+  return "grid max-w-6xl gap-6 sm:grid-cols-2 xl:grid-cols-4";
+}
 
 export default function AdminSocialHomepagePreview() {
   const [cards, setCards] = useState<HomepageSocialCard[]>([]);
@@ -88,18 +97,19 @@ export default function AdminSocialHomepagePreview() {
       {error && <p className="mt-4 text-sm text-aw-warning">{error}</p>}
       {loading && <p className="mt-4 text-sm text-aw-muted">Vorschau wird geladen …</p>}
 
-      <div className={`mx-auto mt-6 ${MODE_WIDTH[mode]}`}>
+      <div className="mx-auto mt-6">
         {cards.length === 0 ? (
           <p className="text-center text-sm text-aw-muted">
             Keine Kanäle für die Startseiten-Anzeige aktiv.
           </p>
         ) : (
-          <div className={`grid gap-6 ${MODE_GRID[mode]}`}>
+          <div className={`mx-auto ${previewLayoutClass(mode, cards.length)}`}>
             {cards.map((card) => (
               <SocialPlatformCardView
                 key={card.id}
                 platform={card}
                 followerLabel={followerLabel}
+                variant={cards.length === 1 ? "spotlight" : "card"}
               />
             ))}
           </div>

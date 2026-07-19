@@ -80,6 +80,8 @@ export type HomepageSocialCard = {
   showFollowerCount: boolean;
   coverImageUrl: string | null;
   tags: string[];
+  /** Echte Vorschaubilder (Sync/Cover) — sonst bewusstes CTA ohne Fake-Feed. */
+  hasMediaPreviews: boolean;
   previewItems: Array<{ label: string; thumbnailUrl: string | null }>;
   accent: string;
   ctaLabel: string;
@@ -121,11 +123,12 @@ export const PLATFORM_ICONS: Record<SocialMediaPlatform, string> = {
   YOUTUBE: "youtube",
 };
 
+/** Brand-aligned Gradients (kein Plattform-Lila/Pink als Startseiten-Look). */
 export const PLATFORM_ACCENTS: Record<SocialMediaPlatform, string> = {
-  TIKTOK: "from-pink-500/20",
-  INSTAGRAM: "from-purple-500/20",
-  FACEBOOK: "from-blue-500/20",
-  YOUTUBE: "from-red-500/20",
+  TIKTOK: "from-aw-gold/20 via-aw-brown/35",
+  INSTAGRAM: "from-aw-gold/25 via-aw-brown/40",
+  FACEBOOK: "from-aw-brown/35 via-aw-gold/15",
+  YOUTUBE: "from-aw-gold/20 via-aw-brown/45",
 };
 
 export const SOCIAL_PLATFORM_LABELS: Record<SocialMediaPlatform, string> = {

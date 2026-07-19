@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import ChallengePreviewCard from "@/components/cards/ChallengePreviewCard";
 import SocialPlatformCard from "@/components/cards/SocialPlatformCard";
 import PlatformText from "@/components/platform-text/PlatformText";
@@ -7,6 +5,19 @@ import { getHomepageChallengeData } from "@/lib/challenges/challenge-service";
 import { getHomepageSocialCards } from "@/lib/social-media/social-media-homepage-service";
 import { getSessionUserIdFromCookies } from "@/lib/auth/session";
 import { checkChallengeEligibility } from "@/lib/challenges/challenge-eligibility";
+
+function socialCardsLayoutClass(count: number): string {
+  if (count <= 1) {
+    return "mx-auto max-w-3xl";
+  }
+  if (count === 2) {
+    return "mx-auto grid max-w-3xl gap-6 sm:grid-cols-2";
+  }
+  if (count === 3) {
+    return "mx-auto grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3";
+  }
+  return "grid gap-6 sm:grid-cols-2 xl:grid-cols-4";
+}
 
 export default async function HomepageCommunitySocialSection() {
   const userId = await getSessionUserIdFromCookies();
@@ -21,6 +32,8 @@ export default async function HomepageCommunitySocialSection() {
           eligibilityConfig: challengeData.challenge.eligibilityConfig,
         })).eligible
       : false;
+
+  const singleChannel = socialCards.length === 1;
 
   return (
     <section className="border-t border-aw-border bg-aw-surface/40">
@@ -46,14 +59,18 @@ export default async function HomepageCommunitySocialSection() {
             elementType="text"
             as="p"
             className="mt-4 text-base leading-7 text-aw-muted"
-            fallback="Folge uns auf Social Media und nimm an der monatlichen Wurst-Challenge teil."
+            fallback="Folge uns auf Social Media für Inspiration aus der Werkstatt."
           />
         </div>
 
         {socialCards.length > 0 ? (
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={`mt-12 ${socialCardsLayoutClass(socialCards.length)}`}>
             {socialCards.map((platform) => (
-              <SocialPlatformCard key={platform.id} platform={platform} />
+              <SocialPlatformCard
+                key={platform.id}
+                platform={platform}
+                variant={singleChannel ? "spotlight" : "card"}
+              />
             ))}
           </div>
         ) : (

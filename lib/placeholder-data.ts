@@ -725,7 +725,7 @@ export const socialPlatforms: SocialPlatform[] = [
     name: "TikTok",
     description: "Kurze Praxistipps, Rezeptideen und Einblicke aus dem Wurstkessel.",
     followers: "+1.200",
-    accent: "from-pink-500/20",
+    accent: "from-aw-gold/20",
     preview: [
       { label: "Brät-Tipp", accent: "from-aw-gold/30" },
       { label: "Gewürzmischung", accent: "from-aw-brown/40" },
@@ -737,7 +737,7 @@ export const socialPlatforms: SocialPlatform[] = [
     name: "Instagram",
     description: "Visuelle Inspiration, Rezeptfotos und Einblicke hinter die Kulissen.",
     followers: "+3.400",
-    accent: "from-purple-500/20",
+    accent: "from-aw-gold/25",
     preview: [
       { label: "Bratwurst", accent: "from-aw-gold/25" },
       { label: "Werkstatt", accent: "from-aw-brown/40" },
@@ -749,7 +749,7 @@ export const socialPlatforms: SocialPlatform[] = [
     name: "Facebook",
     description: "Community-Austausch, Events und Neuigkeiten aus der Alles-Wurst Welt.",
     followers: "+2.800",
-    accent: "from-blue-500/20",
+    accent: "from-aw-brown/35",
     preview: [
       { label: "Gruppe", accent: "from-aw-gold/20" },
       { label: "Live-Q&A", accent: "from-aw-brown/40" },
@@ -761,7 +761,7 @@ export const socialPlatforms: SocialPlatform[] = [
     name: "YouTube",
     description: "Ausführliche Tutorials, Kursausschnitte und Meister-Demonstrationen.",
     followers: "+5.600",
-    accent: "from-red-500/20",
+    accent: "from-aw-gold/20",
     preview: [
       { label: "Tutorial", accent: "from-aw-gold/25" },
       { label: "Kursclip", accent: "from-aw-brown/40" },

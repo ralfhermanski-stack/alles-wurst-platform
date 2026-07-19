@@ -44,6 +44,8 @@ Keine geheimen Werte in dieses Dokument eintragen.
 
 **Account-ID ermitteln:** Meta Graph API Explorer → `me/accounts` → verbundene Page → `instagram_business_account`.
 
+**Ohne API / nur Profil-Link:** Kanal im Modus „Manuell“ mit Profil-URL reicht für die Startseite. Es erscheint ein bewusster Folge-CTA (kein Feed). Für echte Beitragsbilder: entweder Graph-API + Sync **oder** unter Beiträge manuell Vorschaubilder hinterlegen **oder** ein Cover-Bild am Kanal setzen.
+
 **Fallback:** Modus „Manuell“ — Beiträge unter Marketing → Social Media → Beiträge pflegen.
 
 ## Facebook
