@@ -81,8 +81,8 @@ export const MEMBERSHIP_ROLES: readonly MembershipRole[] = [
 /** Max. eigene Rezepte — `null` = unbegrenzt, `0` = nicht erlaubt */
 export const RECIPE_OWN_LIMITS: Record<MembershipRole, number | null> = {
   guest: 0,
-  registered: 3,
-  wurstclub: null,
+  registered: 0,
+  wurstclub: 0,
   meisterclub: null,
   accounting: null,
   admin: null,
@@ -135,17 +135,11 @@ const ROLE_CAPABILITIES: Record<MembershipRole, ReadonlySet<MembershipCapability
   {
     guest: new Set(),
     registered: new Set([
-      "recipe.own.list",
-      "recipe.own.create",
       "recipe.database.read",
-      "recipe.database.copy",
       "marinade.use",
     ]),
     wurstclub: new Set([
-      "recipe.own.list",
-      "recipe.own.create",
       "recipe.database.read",
-      "recipe.database.copy",
       "marinade.use",
       "marinade.save",
       "marinade.pdf",
@@ -222,13 +216,13 @@ export const MEMBERSHIP_BLOCK_MESSAGES: Record<
   string
 > = {
   "recipe.own.list":
-    "Eigene Rezepte sind erst nach Registrierung verfügbar. Bitte melde dich an oder werde Mitglied.",
+    "Der Rezeptgenerator und eigene Rezepte sind dem Meisterclub vorbehalten.",
   "recipe.own.create":
-    "Eigene Rezepte können in deiner Stufe nicht angelegt werden.",
+    "Eigene Rezepte anlegen ist dem Meisterclub vorbehalten.",
   "recipe.database.read":
     "Die Rezeptdatenbank ist für registrierte Mitglieder und Club-Stufen vorgesehen.",
   "recipe.database.copy":
-    "Zum Kopieren in eigene Rezepte ist eine Anmeldung erforderlich.",
+    "Zum Kopieren in den Rezeptgenerator ist eine Meisterclub-Mitgliedschaft erforderlich.",
   "recipe.analysis":
     "Die Meisteranalyse ist der Meisterclub-Stufe vorbehalten (in Vorbereitung).",
   "marinade.use":
@@ -266,7 +260,7 @@ export const MEMBERSHIP_BLOCK_MESSAGES: Record<
 };
 
 export const MEMBERSHIP_LIMIT_MESSAGE_REGISTERED =
-  "Du hast das Limit von 3 eigenen Rezepten in der Basis-Registrierung erreicht. Upgrade auf Wurst Club für unbegrenzte Rezepte.";
+  "Der Rezeptgenerator ist dem Meisterclub vorbehalten.";
 
 export const MEMBERSHIP_ACCESS_BLOCKED_MESSAGE =
   "Dein Rezept- und Club-Zugriff wurde vorübergehend gesperrt. Bitte wende dich an den Support oder die Buchhaltung.";

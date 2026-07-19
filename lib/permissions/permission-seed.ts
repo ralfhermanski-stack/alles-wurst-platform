@@ -22,24 +22,17 @@ const REGISTERED_PERMISSIONS = [
   "blog.public.view",
   "recipe.view.public",
   "recipe.view.monthly",
-  "recipe.create",
-  "recipe.edit.own",
-  "recipe.delete.own",
-  "recipe.export.own",
-  "recipe.pdf.own",
-  "recipe.share.own",
   "workshop.home.view",
   "workshop.home.open",
-  "workshop.recipe-generator.view",
-  "workshop.recipe-generator.open",
-  "workshop.recipe-generator.use",
+  // Salzrechner für alle registrierten Nutzer (inkl. Beta mit registered-Rechten).
+  "workshop.salt-calculator.view",
+  "workshop.salt-calculator.open",
+  "workshop.salt-calculator.use",
   // Seite öffnen; Inhalt bleibt stufengefiltert (nur Rezept des Monats).
   "workshop.recipe-database.view",
   "workshop.recipe-database.open",
   "workshop.recipe-of-month.view",
   "workshop.recipe-of-month.open",
-  "workshop.own-recipes.view",
-  "workshop.own-recipes.open",
   "forum.view",
   "forum.open",
   "forum.reply.create",
@@ -57,9 +50,6 @@ const WURSTCLUB_PERMISSIONS = [
   "membership.benefits.view",
   // Club-Inhalte in der Rezeptdatenbank (Ralf-Rezepte u. a.).
   "recipe.view.premium",
-  "workshop.salt-calculator.view",
-  "workshop.salt-calculator.open",
-  "workshop.salt-calculator.use",
 ];
 
 const WURSTCLUB_PRO_PERMISSIONS = [
@@ -74,6 +64,18 @@ const WURSTCLUB_PRO_PERMISSIONS = [
 
 const MEISTERCLUB_PERMISSIONS = [
   ...WURSTCLUB_PRO_PERMISSIONS,
+  // Rezeptgenerator nur Meisterclub (nicht für registered / Wurstclub).
+  "workshop.recipe-generator.view",
+  "workshop.recipe-generator.open",
+  "workshop.recipe-generator.use",
+  "workshop.own-recipes.view",
+  "workshop.own-recipes.open",
+  "recipe.create",
+  "recipe.edit.own",
+  "recipe.delete.own",
+  "recipe.export.own",
+  "recipe.pdf.own",
+  "recipe.share.own",
   "workshop.spice-calculator.view",
   "workshop.spice-calculator.open",
   "workshop.spice-calculator.use",

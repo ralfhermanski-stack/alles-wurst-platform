@@ -380,7 +380,7 @@ export const tools: Tool[] = [
     name: "Rezeptgenerator",
     description:
       "Wurstrezepturen erstellen, berechnen und speichern – mit Fleisch-, Schüttungs- und Gewürzlogik.",
-    access: "Premium",
+    access: "Meister",
     icon: "recipe",
   },
   {

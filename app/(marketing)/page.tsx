@@ -29,6 +29,8 @@ import {
 } from "@/lib/placeholder-data";
 import { getHomepageBlogPosts } from "@/lib/blog/blog-service";
 import { getSessionUserIdFromCookies } from "@/lib/auth/session";
+import { getEffectivePermissionKeysForUser } from "@/lib/permissions/granular-admin-auth";
+import { TOOL_PERMISSION_BY_SLUG } from "@/lib/permissions/navigation-permissions";
 import { buildStaticPageMetadata } from "@/lib/page-seo/page-seo-static-metadata";
 import PageSeoJsonLd from "@/components/seo/PageSeoJsonLd";
 
@@ -54,6 +56,18 @@ export default async function HomePage() {
     featuredCourses.map((course) => course.id),
   );
   const membershipCtaHref = userId ? "/mitgliedschaft" : "/registrieren";
+
+  let homepageTools = tools.filter((tool) => tool.access === "Öffentlich");
+
+  if (userId) {
+    const allowed = new Set(await getEffectivePermissionKeysForUser(userId));
+    homepageTools = tools.filter((tool) => {
+      const key = TOOL_PERMISSION_BY_SLUG[tool.slug];
+      return !key || allowed.has(key);
+    });
+  }
+
+  homepageTools = homepageTools.slice(0, 3);
 
   return (
     <>
@@ -268,7 +282,7 @@ export default async function HomePage() {
               />
           </div>
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {tools.slice(0, 3).map((tool) => (
+            {homepageTools.map((tool) => (
               <ToolCard key={tool.slug} tool={tool} />
             ))}
           </div>

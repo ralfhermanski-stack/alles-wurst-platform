@@ -134,6 +134,8 @@ async function main() {
 
   // 1. Registrierter sieht keine Meisterclub-Werkzeuge
   assert(!regKeys.has("workshop.spice-calculator.view"), "1. Registered ohne Meisterclub-Werkzeuge");
+  assert(!regKeys.has("workshop.recipe-generator.view"), "1. Registered ohne Rezeptgenerator");
+  assert(regKeys.has("workshop.salt-calculator.view"), "1. Registered hat Salzrechner");
 
   // 2. Wurstclub nur freigegebene Funktionen
   const wurstclub = await prisma.userGroup.findUnique({
@@ -142,10 +144,12 @@ async function main() {
   });
   const wcKeys = new Set(wurstclub?.permissions.map((e) => e.permission.key) ?? []);
   assert(wcKeys.has("workshop.salt-calculator.view"), "2. Wurstclub hat Salzrechner");
+  assert(!wcKeys.has("workshop.recipe-generator.view"), "2. Wurstclub ohne Rezeptgenerator");
   assert(!wcKeys.has("workshop.spice-calculator.view"), "2. Wurstclub ohne Meister-Werkzeuge");
 
   // 3. Meisterclub erweiterte Werkstatt
   assert(meisterKeys.has("workshop.spice-calculator.view"), "3. Meisterclub erweiterte Werkstatt");
+  assert(meisterKeys.has("workshop.recipe-generator.view"), "3. Meisterclub hat Rezeptgenerator");
 
   // 4–6. Rezept-Sharing Eigentümerprüfung (Logik-Spiegel)
   const ownerId = "11111111-1111-1111-1111-111111111111";
