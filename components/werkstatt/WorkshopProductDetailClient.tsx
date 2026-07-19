@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import WorkshopProductImageDisclaimer from "@/components/werkstatt/WorkshopProductImageDisclaimer";
 import type { ProductRecommendationDetail } from "@/lib/product-recommendations/product-recommendation-types";
 import {
   primaryButtonClassName,
@@ -40,18 +41,21 @@ export default function WorkshopProductDetailClient({
       </Link>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-2">
-        <div className="relative aspect-square overflow-hidden rounded-xl border border-aw-border bg-aw-surface-2">
-          {product.imageUrl && (
-            <Image
-              src={product.imageUrl}
-              alt={product.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              unoptimized
-            />
-          )}
-        </div>
+        <figure>
+          <div className="relative aspect-square overflow-hidden rounded-xl border border-aw-border bg-aw-surface-2">
+            {product.imageUrl && (
+              <Image
+                src={product.imageUrl}
+                alt={product.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                unoptimized
+              />
+            )}
+          </div>
+          <WorkshopProductImageDisclaimer as="figcaption" className="mt-2 px-0.5" />
+        </figure>
 
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-aw-gold">
@@ -127,7 +131,8 @@ export default function WorkshopProductDetailClient({
 
       {product.galleryImageUrls.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-4 font-display text-xl font-bold text-aw-cream">Galerie</h2>
+          <h2 className="font-display text-xl font-bold text-aw-cream">Galerie</h2>
+          <WorkshopProductImageDisclaimer className="mb-4 mt-1" />
           <div className="grid gap-4 sm:grid-cols-3">
             {product.galleryImageUrls.map((url) => (
               <div

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import WorkshopProductImageDisclaimer from "@/components/werkstatt/WorkshopProductImageDisclaimer";
 import type { ProductRecommendationSummary } from "@/lib/product-recommendations/product-recommendation-types";
 
 type WorkshopProductCardProps = {
@@ -13,27 +14,33 @@ export default function WorkshopProductCard({
 }: WorkshopProductCardProps) {
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-xl border border-aw-border bg-aw-surface transition-colors hover:border-aw-gold/50">
-      <div className="relative aspect-[4/3] overflow-hidden bg-aw-surface-2">
-        {product.imageUrl ? (
-          <Image
-            src={product.imageUrl}
-            alt={product.title}
-            fill
-            className="object-cover transition-transform group-hover:scale-105"
-            sizes="(max-width: 768px) 100vw, 33vw"
-            unoptimized
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-aw-muted">
-            Kein Bild
-          </div>
-        )}
-        {product.isMasterRecommendation && (
-          <span className="absolute left-3 top-3 rounded-full bg-aw-gold/90 px-2.5 py-1 text-xs font-semibold text-aw-surface">
-            Meister-Empfehlung
-          </span>
-        )}
-      </div>
+      <figure>
+        <div className="relative aspect-[4/3] overflow-hidden bg-aw-surface-2">
+          {product.imageUrl ? (
+            <Image
+              src={product.imageUrl}
+              alt={product.title}
+              fill
+              className="object-cover transition-transform group-hover:scale-105"
+              sizes="(max-width: 768px) 100vw, 33vw"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-aw-muted">
+              Kein Bild
+            </div>
+          )}
+          {product.isMasterRecommendation && (
+            <span className="absolute left-3 top-3 rounded-full bg-aw-gold/90 px-2.5 py-1 text-xs font-semibold text-aw-surface">
+              Meister-Empfehlung
+            </span>
+          )}
+        </div>
+        <WorkshopProductImageDisclaimer
+          as="figcaption"
+          className="border-t border-aw-border/40 bg-aw-surface-2/80 px-3 py-1.5 leading-4"
+        />
+      </figure>
 
       <div className="flex flex-1 flex-col p-5">
         <p className="text-xs font-medium uppercase tracking-wide text-aw-gold">
