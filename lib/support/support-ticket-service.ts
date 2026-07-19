@@ -422,6 +422,32 @@ export async function createSupportTicket(
     userId,
   );
 
+  const ticketUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      profile: { select: { firstName: true, publicName: true } },
+    },
+  });
+
+  if (ticketUser?.email) {
+    const { notifyStaffOfSupportTicketEvent } = await import(
+      "./support-staff-notify"
+    );
+
+    void notifyStaffOfSupportTicketEvent({
+      kind: "created",
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      subject: ticket.subject,
+      priority: ticket.priority,
+      categoryName: category.name,
+      userEmail: ticketUser.email,
+      userDisplayName: getPublicUserName({ profile: ticketUser.profile }),
+      messagePreview: message,
+    }).catch(console.error);
+  }
+
   return getUserSupportTicketDetail(userId, ticketNumber);
 }
 
@@ -524,6 +550,32 @@ export async function addUserSupportReply(
   });
 
   await recordEvent(ticket.id, "user_reply", "Nutzer hat geantwortet.", userId);
+
+  const ticketUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      profile: { select: { firstName: true, publicName: true } },
+    },
+  });
+
+  if (ticketUser?.email) {
+    const { notifyStaffOfSupportTicketEvent } = await import(
+      "./support-staff-notify"
+    );
+
+    void notifyStaffOfSupportTicketEvent({
+      kind: "user_reply",
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      subject: ticket.subject,
+      priority: ticket.priority,
+      categoryName: ticket.category?.name,
+      userEmail: ticketUser.email,
+      userDisplayName: getPublicUserName({ profile: ticketUser.profile }),
+      messagePreview: trimmed,
+    }).catch(console.error);
+  }
 
   return getUserSupportTicketDetail(userId, ticketNumber);
 }
