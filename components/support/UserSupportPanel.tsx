@@ -31,15 +31,34 @@ function TicketRow({
   ticket: SupportTicketSummary;
   ticketBasePath: string;
 }) {
+  const hasUnread = ticket.userUnreadCount > 0;
+
   return (
     <Link
       href={`${ticketBasePath}/${encodeURIComponent(ticket.ticketNumber)}`}
-      className="block rounded-xl border border-aw-border bg-aw-surface/40 p-4 transition-colors hover:border-aw-gold/40 hover:bg-aw-surface/60"
+      className={`block rounded-xl border p-4 transition-colors ${
+        hasUnread
+          ? "border-aw-gold/50 bg-aw-gold/10 hover:border-aw-gold hover:bg-aw-gold/15"
+          : "border-aw-border bg-aw-surface/40 hover:border-aw-gold/40 hover:bg-aw-surface/60"
+      }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-aw-muted">{ticket.ticketNumber}</p>
-          <h3 className="mt-1 font-medium text-aw-cream">{ticket.subject}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs text-aw-muted">{ticket.ticketNumber}</p>
+            {hasUnread && (
+              <span className="rounded-full bg-aw-gold px-2 py-0.5 text-xs font-bold text-aw-bg">
+                {ticket.userUnreadCount === 1
+                  ? "Neue Antwort"
+                  : `${ticket.userUnreadCount} neue Antworten`}
+              </span>
+            )}
+          </div>
+          <h3
+            className={`mt-1 font-medium ${hasUnread ? "text-aw-cream" : "text-aw-cream"}`}
+          >
+            {ticket.subject}
+          </h3>
           <p className="mt-1 text-sm text-aw-muted">{ticket.categoryName}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -55,11 +74,6 @@ function TicketRow({
             timeStyle: "short",
           }).format(new Date(ticket.updatedAt))}
         </span>
-        {ticket.userUnreadCount > 0 && (
-          <span className="rounded-full bg-aw-gold/20 px-2 py-0.5 text-aw-gold">
-            {ticket.userUnreadCount} neu
-          </span>
-        )}
         {ticket.userHasReminder && (
           <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-violet-300">
             Erinnerung
@@ -132,6 +146,22 @@ export default function UserSupportPanel({
           Neues Ticket
         </Link>
       </div>
+
+      {inbox && inbox.unreadCount > 0 && (
+        <div
+          className="rounded-xl border border-aw-gold/40 bg-aw-gold/10 px-4 py-4"
+          role="status"
+        >
+          <p className="font-semibold text-aw-cream">
+            {inbox.unreadCount === 1
+              ? "Du hast eine ungelesene Support-Antwort"
+              : `Du hast ${inbox.unreadCount} Tickets mit neuen Antworten`}
+          </p>
+          <p className="mt-1 text-sm text-aw-muted">
+            Ungelesene Tickets stehen oben und sind hervorgehoben.
+          </p>
+        </div>
+      )}
 
       {inbox && (
         <div className="grid gap-4 sm:grid-cols-3">

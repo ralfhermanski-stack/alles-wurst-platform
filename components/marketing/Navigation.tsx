@@ -5,7 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { fetchSessionApi } from "@/lib/auth/auth-client";
+import { useMemberNotificationCounts } from "@/lib/member/use-member-notification-counts";
 import { marketingNav } from "@/lib/placeholder-data";
+
+function formatBadgeCount(count: number): string {
+  return count > 9 ? "9+" : String(count);
+}
 
 /**
  * Hauptnavigation für das Marketing-Layout.
@@ -14,6 +19,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { totalUnreadCount } = useMemberNotificationCounts(isLoggedIn);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +41,20 @@ export default function Navigation() {
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  const meinBereichLabel = (
+    <>
+      Mein Bereich
+      {isLoggedIn && totalUnreadCount > 0 && (
+        <span
+          className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg"
+          aria-label={`${totalUnreadCount} ungelesen`}
+        >
+          {formatBadgeCount(totalUnreadCount)}
+        </span>
+      )}
+    </>
+  );
 
   return (
     <>
@@ -58,9 +78,9 @@ export default function Navigation() {
         {isLoggedIn ? (
           <Link
             href="/mein-bereich"
-            className="rounded-md px-3 py-2 text-sm font-medium text-aw-cream/80 transition-colors hover:text-aw-cream"
+            className="inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-aw-cream/80 transition-colors hover:text-aw-cream"
           >
-            Mein Bereich
+            {meinBereichLabel}
           </Link>
         ) : (
           <Link
@@ -119,9 +139,9 @@ export default function Navigation() {
               <Link
                 href={isLoggedIn ? "/mein-bereich" : "/anmelden"}
                 onClick={() => setOpen(false)}
-                className="rounded-md px-3 py-3 text-center text-base font-medium text-aw-cream/90 ring-1 ring-aw-border hover:bg-aw-surface-2"
+                className="inline-flex items-center justify-center rounded-md px-3 py-3 text-center text-base font-medium text-aw-cream/90 ring-1 ring-aw-border hover:bg-aw-surface-2"
               >
-                {isLoggedIn ? "Mein Bereich" : "Anmelden"}
+                {isLoggedIn ? meinBereichLabel : "Anmelden"}
               </Link>
               <Link
                 href={isLoggedIn ? "/mitgliedschaft" : "/registrieren"}

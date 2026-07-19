@@ -381,6 +381,7 @@ model User {
   platformReviewsModerated PlatformReview[] @relation("PlatformReviewModerator")
   forumThreads            ForumThread[]
   forumPosts              ForumPost[]
+  forumThreadWatches      ForumThreadWatch[]
   supportTicketsCreated   SupportTicket[]         @relation("SupportTicketCreator")
   supportTicketsAssigned  SupportTicket[]         @relation("SupportTicketAssignee")
   supportTicketMessages   SupportTicketMessage[]
@@ -1832,7 +1833,8 @@ model ForumThread {
   avatarUrlSnapshot   String? @map("avatar_url_snapshot")
   authorRoleBadge     String? @map("author_role_badge")
 
-  posts ForumPost[]
+  posts   ForumPost[]
+  watches ForumThreadWatch[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1863,6 +1865,27 @@ model ForumPost {
 
   @@index([threadId, createdAt])
   @@map("forum_posts")
+}
+
+/// Abonnement / Ungelesen-Zähler für Forum-Threads (OP + Mitposter)
+model ForumThreadWatch {
+  id String @id @default(uuid()) @db.Uuid
+
+  threadId String      @map("thread_id") @db.Uuid
+  thread   ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  unreadCount Int      @default(0) @map("unread_count")
+  lastReadAt  DateTime @default(now()) @map("last_read_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([threadId, userId])
+  @@index([userId, unreadCount])
+  @@map("forum_thread_watches")
 }
 
 /// Systemweite Einstellungen (z. B. globale Minikurs-Foren)

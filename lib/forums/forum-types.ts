@@ -59,6 +59,7 @@ export type ForumThreadEntry = {
   isLocked: boolean;
   author: ForumAuthorEntry;
   replyCount: number;
+  userUnreadCount: number;
   createdAt: string;
   updatedAt: string;
 };

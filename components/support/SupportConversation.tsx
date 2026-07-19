@@ -32,7 +32,9 @@ export default function SupportConversation({
             key={message.id}
             className={`rounded-xl border p-4 ${
               isStaff
-                ? "border-aw-gold/30 bg-aw-gold/5"
+                ? message.isNewForUser
+                  ? "border-aw-gold/60 bg-aw-gold/15 ring-1 ring-aw-gold/30"
+                  : "border-aw-gold/30 bg-aw-gold/5"
                 : "border-aw-border bg-aw-surface/40"
             }`}
           >
@@ -43,6 +45,11 @@ export default function SupportConversation({
               {message.authorRoleBadge && (
                 <span className="rounded-full bg-aw-gold/15 px-2 py-0.5 text-xs text-aw-gold">
                   {message.authorRoleBadge}
+                </span>
+              )}
+              {message.isNewForUser && (
+                <span className="rounded-full bg-aw-gold px-2 py-0.5 text-xs font-bold text-aw-bg">
+                  Neu
                 </span>
               )}
               <span className="text-xs text-aw-muted">

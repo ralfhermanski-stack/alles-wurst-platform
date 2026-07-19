@@ -133,6 +133,7 @@ async function loadMessages(ticketId: string): Promise<SupportMessageEntry[]> {
         ? staffBadge(message.author.systemRole)
         : null,
     body: message.body,
+    isNewForUser: !message.isReadByUser && message.authorType === "staff",
     createdAt: message.createdAt.toISOString(),
     attachments: message.attachments.map(
       (attachment): SupportAttachmentEntry => ({
@@ -347,7 +348,7 @@ export async function listUserSupportTickets(
   const tickets = await prisma.supportTicket.findMany({
     where: { userId, anonymizedAt: null },
     include: ticketInclude,
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ userUnreadCount: "desc" }, { updatedAt: "desc" }],
   });
 
   return tickets.map(toSummary);
@@ -437,6 +438,9 @@ export async function getUserSupportTicketDetail(
     });
   }
 
+  // Nachrichten zuerst laden, damit isNewForUser noch stimmt — danach als gelesen markieren
+  const messages = await loadMessages(ticket.id);
+
   if (ticket.userUnreadCount > 0 || ticket.userHasReminder) {
     await prisma.supportTicket.update({
       where: { id: ticket.id },
@@ -452,10 +456,10 @@ export async function getUserSupportTicketDetail(
     });
   }
 
-  const messages = await loadMessages(ticket.id);
-
   return userSuccess({
     ...toSummary(ticket),
+    userUnreadCount: 0,
+    userHasReminder: false,
     categoryId: ticket.categoryId,
     userId: ticket.userId,
     userDisplayName: getPublicUserName({ profile: ticket.user.profile }),

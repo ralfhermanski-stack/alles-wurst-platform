@@ -65,7 +65,8 @@ function computeProfileCompletion(profile: MyProfileResponse | null): {
 
 export default function MeinBereichContent() {
   const { user, loading, refresh } = useAuth();
-  const { supportUnreadCount } = useMemberNotificationCounts();
+  const { supportUnreadCount, forumUnreadCount, messageUnreadCount } =
+    useMemberNotificationCounts();
 
   const [courses, setCourses] = useState<UserCourseEntry[]>([]);
   const [certificates, setCertificates] = useState<CertificateSummary[]>([]);
@@ -199,6 +200,47 @@ export default function MeinBereichContent() {
             className="mt-3 inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
           >
             Zu meinen Tickets →
+          </Link>
+        </div>
+      )}
+
+      {forumUnreadCount > 0 && (
+        <div
+          className="mt-6 rounded-xl border border-aw-gold/40 bg-aw-gold/10 px-4 py-4 sm:px-5"
+          role="status"
+        >
+          <p className="font-semibold text-aw-cream">
+            {forumUnreadCount === 1
+              ? "Neue Aktivität in einem deiner Forenthemen"
+              : `Neue Aktivität in ${forumUnreadCount} deiner Forenthemen`}
+          </p>
+          <p className="mt-1 text-sm text-aw-muted">
+            Jemand hat auf ein Thema geantwortet, das du verfolgst.
+          </p>
+          <Link
+            href="/mein-bereich/foren"
+            className="mt-3 inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+          >
+            Zu den Foren →
+          </Link>
+        </div>
+      )}
+
+      {messageUnreadCount > 0 && supportUnreadCount === 0 && forumUnreadCount === 0 && (
+        <div
+          className="mt-6 rounded-xl border border-aw-gold/40 bg-aw-gold/10 px-4 py-4 sm:px-5"
+          role="status"
+        >
+          <p className="font-semibold text-aw-cream">
+            {messageUnreadCount === 1
+              ? "Du hast eine neue Nachricht"
+              : `Du hast ${messageUnreadCount} neue Nachrichten`}
+          </p>
+          <Link
+            href="/mein-bereich/nachrichten"
+            className="mt-3 inline-flex text-sm font-semibold text-aw-gold hover:text-aw-cream"
+          >
+            Zum Posteingang →
           </Link>
         </div>
       )}

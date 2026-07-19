@@ -10,6 +10,7 @@ const BASE_QUICK_LINKS = [
   { href: "/werkstatt", label: "Werkstatt", desc: "Rechner & Generatoren" },
   { href: "/akademie/kurse", label: "Kurskatalog", desc: "Kurse entdecken" },
   { href: "/mein-bereich/kurse", label: "Meine Kurse", desc: "Fortschritt & Lektionen" },
+  { href: "/mein-bereich/foren", label: "Foren", desc: "Community & Themen" },
   { href: "/mein-bereich/bestellungen", label: "Bestellungen", desc: "Rechnungen & Käufe" },
   { href: "/mein-bereich/nachrichten", label: "Nachrichten", desc: "System & Bestätigungen" },
   { href: "/mein-bereich/support", label: "Support", desc: "Hilfe & Tickets" },
@@ -24,7 +25,8 @@ function formatBadgeCount(count: number): string {
 export default function MemberQuickLinks() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { messageUnreadCount, supportUnreadCount } = useMemberNotificationCounts();
+  const { messageUnreadCount, supportUnreadCount, forumUnreadCount } =
+    useMemberNotificationCounts();
 
   const quickLinks = user?.maintenanceBypass
     ? [
@@ -51,7 +53,9 @@ export default function MemberQuickLinks() {
             ? messageUnreadCount
             : item.href === "/mein-bereich/support"
               ? supportUnreadCount
-              : 0;
+              : item.href === "/mein-bereich/foren"
+                ? forumUnreadCount
+                : 0;
 
         return (
           <Link

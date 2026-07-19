@@ -28,6 +28,11 @@ import {
   threadNotFoundError,
 } from "./forum-permissions";
 import { getForumBySlug } from "./forum-service";
+import {
+  ensureForumThreadWatch,
+  markForumThreadRead,
+  notifyForumThreadReply,
+} from "./forum-watch-service";
 import type {
   CreateForumPostInput,
   CreateForumThreadInput,
@@ -166,9 +171,16 @@ export async function listForumThreads(
 
   const threads = await prisma.forumThread.findMany({
     where: { forumId: forum.id },
-    orderBy: { createdAt: "desc" },
+    orderBy: { updatedAt: "desc" },
     include: {
       _count: { select: { posts: true } },
+      watches: userId
+        ? {
+            where: { userId },
+            select: { unreadCount: true },
+            take: 1,
+          }
+        : false,
     },
   });
 
@@ -181,6 +193,10 @@ export async function listForumThreads(
       isLocked: thread.isLocked,
       author: toAuthorEntry(thread),
       replyCount: thread._count.posts,
+      userUnreadCount:
+        "watches" in thread && Array.isArray(thread.watches)
+          ? (thread.watches[0]?.unreadCount ?? 0)
+          : 0,
       createdAt: thread.createdAt.toISOString(),
       updatedAt: thread.updatedAt.toISOString(),
     })),
@@ -223,6 +239,10 @@ export async function getForumThreadDetail(
     ? await canModerateForum(userId, forum, context)
     : false;
 
+  if (userId) {
+    await markForumThreadRead(thread.id, userId);
+  }
+
   const signatureUserIds = [
     thread.authorUserId,
     ...thread.posts.map((post) => post.authorUserId),
@@ -246,6 +266,7 @@ export async function getForumThreadDetail(
     isLocked: thread.isLocked,
     author: toAuthorEntry(thread),
     replyCount: thread._count.posts,
+    userUnreadCount: 0,
     createdAt: thread.createdAt.toISOString(),
     updatedAt: thread.updatedAt.toISOString(),
     forumSignature: signatures.get(thread.authorUserId) ?? null,
@@ -308,6 +329,8 @@ export async function createForumThread(
     },
   });
 
+  await ensureForumThreadWatch(thread.id, userId, { resetUnread: true });
+
   return userSuccess({
     id: thread.id,
     title: thread.title,
@@ -316,6 +339,7 @@ export async function createForumThread(
     isLocked: thread.isLocked,
     author: toAuthorEntry(thread),
     replyCount: thread._count.posts,
+    userUnreadCount: 0,
     createdAt: thread.createdAt.toISOString(),
     updatedAt: thread.updatedAt.toISOString(),
   });
@@ -390,6 +414,16 @@ export async function createForumPost(
   await prisma.forumThread.update({
     where: { id: thread.id },
     data: { updatedAt: new Date() },
+  });
+
+  await notifyForumThreadReply({
+    threadId: thread.id,
+    forumSlug,
+    threadSlug,
+    threadTitle: thread.title,
+    threadAuthorUserId: thread.authorUserId,
+    replyAuthorUserId: userId,
+    replyAuthorDisplayName: author.displayName,
   });
 
   const signatures = await loadForumSignaturesByUserIds([userId]);

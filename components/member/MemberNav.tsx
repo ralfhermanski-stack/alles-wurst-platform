@@ -18,7 +18,8 @@ function formatBadgeCount(count: number): string {
 export default function MemberNav() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { messageUnreadCount, supportUnreadCount } = useMemberNotificationCounts();
+  const { messageUnreadCount, supportUnreadCount, forumUnreadCount } =
+    useMemberNotificationCounts();
   const [allowedKeys, setAllowedKeys] = useState<Set<string> | null>(null);
 
   useEffect(() => {
@@ -76,7 +77,9 @@ export default function MemberNav() {
             ? messageUnreadCount
             : item.href === "/mein-bereich/support"
               ? supportUnreadCount
-              : 0;
+              : item.href === "/mein-bereich/foren"
+                ? forumUnreadCount
+                : 0;
 
         const showBadge = badgeCount > 0;
 

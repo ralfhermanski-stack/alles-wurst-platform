@@ -25,6 +25,7 @@ export type SupportMessageEntry = {
   authorDisplayName: string;
   authorRoleBadge: string | null;
   body: string;
+  isNewForUser: boolean;
   createdAt: string;
   attachments: SupportAttachmentEntry[];
 };
