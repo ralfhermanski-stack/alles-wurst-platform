@@ -12,6 +12,14 @@ import {
 } from "./recipe-plausibility";
 import type { RecipeCalculationResult } from "./recipe-types";
 
+/** Öffentlicher Pfad zum Produktbild eines Rezepts. */
+export function getRecipeImagePublicPath(recipeId: string): string {
+  return `/api/recipes/${recipeId}/image`;
+}
+
+/** Statisches Wasserzeichen für den Rezept-PDF-Export. */
+export const RECIPE_PDF_WATERMARK_SRC = "/brand/alles-wurst-watermark.png";
+
 export type RecipePdfData = {
   recipe: ApiRecipe;
   calculation: RecipeCalculationResult;
@@ -57,12 +65,109 @@ export function buildPlausibilityContextFromRecipe(
 }
 
 /**
+ * Verkleinert ein Produktbild auf druckfreundliche Größe und liefert eine Data-URL.
+ * Große Originaldateien (mehrere MB) fehlen sonst oft im Druckdialog.
+ */
+async function blobToPrintDataUrl(
+  blob: Blob,
+  maxEdgePx = 900,
+): Promise<string> {
+  const bitmap = await createImageBitmap(blob);
+  const scale = Math.min(1, maxEdgePx / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    bitmap.close();
+    throw new Error("Canvas nicht verfügbar.");
+  }
+
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+
+  return canvas.toDataURL("image/jpeg", 0.86);
+}
+
+/**
+ * Lädt das Produktbild und bereitet es für den Druck/PDF-Export vor.
+ * Liefert eine eingebettete Data-URL (kein zusätzlicher Netz-Request beim Drucken).
+ */
+export async function resolveRecipePdfImageUrl(
+  recipe: Pick<ApiRecipe, "id" | "hasImage">,
+): Promise<string | null> {
+  if (!recipe.hasImage) {
+    return null;
+  }
+
+  const path = getRecipeImagePublicPath(recipe.id);
+  const absoluteUrl =
+    typeof window !== "undefined"
+      ? new URL(path, window.location.origin).href
+      : path;
+
+  try {
+    const response = await fetch(absoluteUrl, {
+      credentials: "include",
+      cache: "force-cache",
+    });
+
+    if (!response.ok) {
+      return absoluteUrl;
+    }
+
+    const blob = await response.blob();
+
+    try {
+      return await blobToPrintDataUrl(blob);
+    } catch {
+      return URL.createObjectURL(blob);
+    }
+  } catch {
+    return absoluteUrl;
+  }
+}
+
+/**
+ * Wartet, bis alle Bilder im Druckdokument dekodiert sind.
+ */
+export async function waitForRecipePrintImages(
+  root: ParentNode | null,
+): Promise<void> {
+  if (!root) {
+    return;
+  }
+
+  const images = Array.from(root.querySelectorAll("img"));
+
+  await Promise.all(
+    images.map(async (image) => {
+      if (image.complete && image.naturalHeight > 0) {
+        return;
+      }
+
+      try {
+        await image.decode();
+      } catch {
+        // Fehlende/defekte Bilder sollen den Druck nicht blockieren.
+      }
+    }),
+  );
+}
+
+/**
  * Berechnet alle für den Export benötigten Daten aus einem API-Rezept.
  */
 export function prepareRecipePdfData(
   recipe: ApiRecipe,
   options?: {
     authorName?: string | null;
+    imageUrl?: string | null;
   },
 ): RecipePdfDataResult {
   const calculationRun = runRecipeCalculation(recipe.payload);
@@ -77,13 +182,20 @@ export function prepareRecipePdfData(
     calculationRun.result,
   );
 
+  const resolvedImageUrl =
+    options?.imageUrl !== undefined
+      ? options.imageUrl
+      : recipe.hasImage
+        ? getRecipeImagePublicPath(recipe.id)
+        : null;
+
   return {
     success: true,
     data: {
       recipe,
       calculation: calculationRun.result,
       plausibilityIssues: plausibility.issues,
-      imageUrl: recipe.hasImage ? `/api/recipes/${recipe.id}/image` : null,
+      imageUrl: resolvedImageUrl,
       authorName: options?.authorName?.trim() || null,
     },
   };

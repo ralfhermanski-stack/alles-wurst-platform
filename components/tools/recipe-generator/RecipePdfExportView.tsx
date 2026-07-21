@@ -16,6 +16,8 @@ import { fetchSessionApi } from "@/lib/auth/auth-client";
 import { fetchRecipe } from "@/lib/tools/recipe-client";
 import {
   prepareRecipePdfData,
+  resolveRecipePdfImageUrl,
+  waitForRecipePrintImages,
   type RecipePdfData,
 } from "@/lib/tools/recipe-pdf-data";
 import {
@@ -177,7 +179,22 @@ export default function RecipePdfExportView({
         }
       }
 
-      const prepared = prepareRecipePdfData(response.data, { authorName });
+      if (cancelled) {
+        return;
+      }
+
+      // Produktbild vor dem Druck laden und als Data-URL einbetten —
+      // sonst fehlen große Bilder oft im Druckdialog (Timing/Netzwerk).
+      const imageUrl = await resolveRecipePdfImageUrl(response.data);
+
+      if (cancelled) {
+        return;
+      }
+
+      const prepared = prepareRecipePdfData(response.data, {
+        authorName,
+        imageUrl,
+      });
 
       if (!prepared.success) {
         setError(prepared.error);
@@ -219,13 +236,34 @@ export default function RecipePdfExportView({
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+
+    async function triggerPrint() {
+      // Kurz warten, bis React das Druckdokument gemountet hat.
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
+
+      if (cancelled) {
+        return;
+      }
+
+      await waitForRecipePrintImages(
+        document.querySelector(".recipe-print-document"),
+      );
+
+      if (cancelled) {
+        return;
+      }
+
       window.print();
       setPrintTriggered(true);
-    }, 400);
+    }
+
+    void triggerPrint();
 
     return () => {
-      window.clearTimeout(timer);
+      cancelled = true;
     };
   }, [autoPrint, loading, error, pdfData, printTriggered, authorDisplay]);
 

@@ -78,6 +78,17 @@ body {
 
   .recipe-print-document {
     max-width: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .recipe-print-document img {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .recipe-print-watermark {
+    opacity: 0.1 !important;
   }
 
   .recipe-print-footer {

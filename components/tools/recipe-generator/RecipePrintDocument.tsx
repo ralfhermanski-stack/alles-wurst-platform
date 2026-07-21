@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
-import type { RecipePdfData } from "@/lib/tools/recipe-pdf-data";
+import {
+  RECIPE_PDF_WATERMARK_SRC,
+  type RecipePdfData,
+} from "@/lib/tools/recipe-pdf-data";
 import {
   DEFAULT_RECIPE_PDF_SETTINGS,
   type RecipePdfSettings,
@@ -151,7 +154,20 @@ export default function RecipePrintDocument({
   const schuettung = payload.schuettung;
 
   return (
-    <article className="recipe-print-document mx-auto max-w-[210mm] bg-aw-bg px-6 py-8 text-aw-cream print:bg-white print:px-0 print:py-0 print:text-gray-900">
+    <article className="recipe-print-document relative mx-auto max-w-[210mm] overflow-hidden bg-aw-bg px-6 py-8 text-aw-cream print:bg-white print:px-0 print:py-0 print:text-gray-900">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={RECIPE_PDF_WATERMARK_SRC}
+          alt=""
+          className="recipe-print-watermark w-[72%] max-w-[150mm] -rotate-[28deg] select-none opacity-[0.11] print:opacity-[0.1]"
+        />
+      </div>
+
+      <div className="relative z-[1]">
       <header className="border-b border-aw-gold/30 pb-6 print:border-[#8b6914]">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="flex min-w-0 flex-1 items-start gap-5">
@@ -192,12 +208,13 @@ export default function RecipePrintDocument({
           </div>
 
           {imageUrl ? (
-            <figure className="w-full max-w-[11rem] shrink-0 sm:w-auto">
+            <figure className="w-full max-w-[11rem] shrink-0 break-inside-avoid sm:w-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imageUrl}
                 alt={`Produktbild: ${recipe.name}`}
                 className="h-36 w-full rounded-xl border border-aw-border object-cover print:border-gray-300"
+                style={{ printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" }}
               />
               <figcaption className="mt-1 text-[10px] text-aw-muted print:text-gray-500">
                 Produktbild
@@ -509,6 +526,7 @@ export default function RecipePrintDocument({
           </p>
         )}
       </footer>
+      </div>
     </article>
   );
 }
