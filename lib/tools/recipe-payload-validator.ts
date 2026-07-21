@@ -46,10 +46,25 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 /**
- * Parst eine optionale endliche Zahl.
+ * Parst eine optionale endliche Zahl (auch aus Strings wie "32" oder "32 mm").
  */
 function parseOptionalNumber(value: unknown): number | undefined {
-  return isFiniteNumber(value) ? value : undefined;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const match = value.trim().replace(",", ".").match(/-?\d+(?:\.\d+)?/);
+
+    if (!match) {
+      return undefined;
+    }
+
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
 }
 
 /**
@@ -413,12 +428,8 @@ export function parseRecipePayload(value: unknown): RecipePayload | null {
     } else {
       payload.casing = {
         casingType: value.casing.casingType,
-        caliberMm: isFiniteNumber(value.casing.caliberMm)
-          ? value.casing.caliberMm
-          : undefined,
-        lengthCm: isFiniteNumber(value.casing.lengthCm)
-          ? value.casing.lengthCm
-          : undefined,
+        caliberMm: parseOptionalNumber(value.casing.caliberMm),
+        lengthCm: parseOptionalNumber(value.casing.lengthCm),
         notes:
           typeof value.casing.notes === "string" ? value.casing.notes : undefined,
       };

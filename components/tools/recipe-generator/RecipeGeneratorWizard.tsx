@@ -76,6 +76,20 @@ const inputSmClassName =
   "w-full rounded-lg border border-aw-border bg-aw-bg px-3 py-2 text-sm text-aw-cream focus:border-aw-gold focus:outline-none focus:ring-1 focus:ring-aw-gold/40";
 
 /**
+ * Liest eine Zahl aus UI-Eingaben wie "32", "32,5" oder "32 mm".
+ */
+function parseUiNumber(raw: string): number | undefined {
+  const match = raw.trim().replace(",", ".").match(/-?\d+(?:\.\d+)?/);
+
+  if (!match) {
+    return undefined;
+  }
+
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
  * Rezept-Wizard mit 8 Schritten und Live-Berechnung.
  */
 export default function RecipeGeneratorWizard({
@@ -174,12 +188,10 @@ export default function RecipeGeneratorWizard({
       };
     }
 
-    if (casingType.trim()) {
+    if (casingType.trim() || casingCaliber.trim()) {
       result.casing = {
-        casingType: casingType.trim(),
-        caliberMm: casingCaliber
-          ? Number(casingCaliber.replace(",", "."))
-          : undefined,
+        casingType: casingType.trim() || "ohne Angabe",
+        caliberMm: parseUiNumber(casingCaliber),
       };
     }
 
@@ -296,7 +308,8 @@ export default function RecipeGeneratorWizard({
       );
       setCasingType(data.payload.casing?.casingType ?? "");
       setCasingCaliber(
-        data.payload.casing?.caliberMm !== undefined
+        data.payload.casing?.caliberMm !== undefined &&
+          data.payload.casing.caliberMm !== null
           ? String(data.payload.casing.caliberMm)
           : "",
       );
@@ -388,6 +401,7 @@ export default function RecipeGeneratorWizard({
         return false;
       }
 
+      hydrateFromApi(response.data);
       setStatus(response.data.status);
       setVisibility(response.data.visibility);
       setSuccess(
@@ -421,7 +435,9 @@ export default function RecipeGeneratorWizard({
         return false;
       }
 
-      if (response.data.status !== targetStatus) {
+      let saved = response.data;
+
+      if (saved.status !== targetStatus) {
         const statusRes = await updateRecipeStatusApi(
           recipeId,
           userId,
@@ -433,8 +449,11 @@ export default function RecipeGeneratorWizard({
           setSaving(false);
           return false;
         }
+
+        saved = statusRes.data;
       }
 
+      hydrateFromApi(saved);
       setStatus(targetStatus);
       setSuccess(
         targetStatus === RecipeStatus.draft
@@ -468,6 +487,7 @@ export default function RecipeGeneratorWizard({
       return false;
     }
 
+    hydrateFromApi(response.data);
     setRecipeId(response.data.id);
     setStatus(response.data.status);
     setSuccess("Rezept angelegt und gespeichert.");
@@ -960,14 +980,14 @@ export default function RecipeGeneratorWizard({
           <div className="space-y-5">
             <div>
               <label htmlFor="casing-type" className={labelClassName}>
-                Darmtyp
+                Darmtyp *
               </label>
               <input
                 id="casing-type"
                 className={`${inputClassName} mt-2`}
                 value={casingType}
                 onChange={(e) => setCasingType(e.target.value)}
-                placeholder="z. B. Schweinedarm 32 mm"
+                placeholder="z. B. Schweinedarm"
               />
             </div>
             <div>
@@ -981,7 +1001,12 @@ export default function RecipeGeneratorWizard({
                 className={`${inputClassName} mt-2`}
                 value={casingCaliber}
                 onChange={(e) => setCasingCaliber(e.target.value)}
+                placeholder="z. B. 32"
               />
+              <p className="mt-2 text-xs text-aw-muted">
+                Nur die Zahl eintragen (z. B. 32). „32 mm“ wird automatisch
+                erkannt.
+              </p>
             </div>
           </div>
         );

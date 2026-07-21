@@ -391,27 +391,33 @@ export default function RecipePrintDocument({
 
       <section className="mt-8 break-inside-avoid">
         <SectionTitle>Därme</SectionTitle>
-        {!casing?.casingType?.trim() ? (
+        {!casing?.casingType?.trim() &&
+        casing?.caliberMm === undefined &&
+        !casing?.notes?.trim() ? (
           <EmptyHint className="mt-3">Keine Darmangaben erfasst.</EmptyHint>
         ) : (
           <dl className="mt-4 grid gap-3 rounded-lg border border-aw-border bg-aw-surface/40 p-4 text-sm print:border-gray-300 print:bg-gray-50 sm:grid-cols-2">
             <div>
               <dt className="text-aw-muted print:text-gray-600">Darmtyp</dt>
-              <dd className="font-medium">{casing.casingType}</dd>
+              <dd className="font-medium">
+                {casing?.casingType?.trim() || "—"}
+              </dd>
             </div>
-            {casing.caliberMm !== undefined && (
-              <div>
-                <dt className="text-aw-muted print:text-gray-600">Kaliber</dt>
-                <dd className="font-medium">{casing.caliberMm} mm</dd>
-              </div>
-            )}
-            {casing.lengthCm !== undefined && (
+            <div>
+              <dt className="text-aw-muted print:text-gray-600">Kaliber</dt>
+              <dd className="font-medium">
+                {casing?.caliberMm !== undefined
+                  ? `${casing.caliberMm} mm`
+                  : "—"}
+              </dd>
+            </div>
+            {casing?.lengthCm !== undefined && (
               <div>
                 <dt className="text-aw-muted print:text-gray-600">Länge</dt>
                 <dd className="font-medium">{casing.lengthCm} cm</dd>
               </div>
             )}
-            {casing.notes && (
+            {casing?.notes && (
               <div className="sm:col-span-2">
                 <dt className="text-aw-muted print:text-gray-600">Notizen</dt>
                 <dd className="mt-1 font-medium">{casing.notes}</dd>
