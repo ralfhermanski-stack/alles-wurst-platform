@@ -42,6 +42,11 @@ import {
   uploadAdminRecipeImageApi,
 } from "@/lib/admin/admin-client";
 import {
+  casingCaliberToMm,
+  formatCasingCaliber,
+  normalizeCasingCaliber,
+} from "@/lib/tools/recipe-casing";
+import {
   REFERENCE_BASIS_LABELS,
   STATUS_LABELS,
   VISIBILITY_LABELS,
@@ -74,20 +79,6 @@ type RecipeGeneratorWizardProps = {
 
 const inputSmClassName =
   "w-full rounded-lg border border-aw-border bg-aw-bg px-3 py-2 text-sm text-aw-cream focus:border-aw-gold focus:outline-none focus:ring-1 focus:ring-aw-gold/40";
-
-/**
- * Liest eine Zahl aus UI-Eingaben wie "32", "32,5" oder "32 mm".
- */
-function parseUiNumber(raw: string): number | undefined {
-  const match = raw.trim().replace(",", ".").match(/-?\d+(?:\.\d+)?/);
-
-  if (!match) {
-    return undefined;
-  }
-
-  const parsed = Number(match[0]);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
 
 /**
  * Rezept-Wizard mit 8 Schritten und Live-Berechnung.
@@ -189,9 +180,11 @@ export default function RecipeGeneratorWizard({
     }
 
     if (casingType.trim() || casingCaliber.trim()) {
+      const caliber = normalizeCasingCaliber(casingCaliber);
       result.casing = {
         casingType: casingType.trim() || "ohne Angabe",
-        caliberMm: parseUiNumber(casingCaliber),
+        caliber,
+        caliberMm: casingCaliberToMm(caliber),
       };
     }
 
@@ -308,10 +301,11 @@ export default function RecipeGeneratorWizard({
       );
       setCasingType(data.payload.casing?.casingType ?? "");
       setCasingCaliber(
-        data.payload.casing?.caliberMm !== undefined &&
+        data.payload.casing?.caliber?.trim() ||
+          (data.payload.casing?.caliberMm !== undefined &&
           data.payload.casing.caliberMm !== null
-          ? String(data.payload.casing.caliberMm)
-          : "",
+            ? String(data.payload.casing.caliberMm)
+            : ""),
       );
       setProductionSteps(data.payload.production?.steps ?? []);
       setProductionNotes(data.payload.production?.notes ?? "");
@@ -997,15 +991,16 @@ export default function RecipeGeneratorWizard({
               <input
                 id="casing-caliber"
                 type="text"
-                inputMode="decimal"
+                inputMode="text"
                 className={`${inputClassName} mt-2`}
                 value={casingCaliber}
                 onChange={(e) => setCasingCaliber(e.target.value)}
-                placeholder="z. B. 32"
+                placeholder="z. B. 28/32"
               />
               <p className="mt-2 text-xs text-aw-muted">
-                Nur die Zahl eintragen (z. B. 32). „32 mm“ wird automatisch
-                erkannt.
+                Därme werden als Bereich angegeben, z. B.{" "}
+                <span className="text-aw-cream">28/32</span>. Einzelwerte wie{" "}
+                <span className="text-aw-cream">32</span> sind weiterhin möglich.
               </p>
             </div>
           </div>
@@ -1154,12 +1149,12 @@ export default function RecipeGeneratorWizard({
               </p>
               <p className="mt-2 text-sm text-aw-cream">
                 Därme:{" "}
-                {casingType.trim()
+                {casingType.trim() || casingCaliber.trim()
                   ? [
-                      casingType.trim(),
-                      casingCaliber.trim()
-                        ? `Kaliber ${casingCaliber.trim()} mm`
-                        : null,
+                      casingType.trim() || null,
+                      formatCasingCaliber({
+                        caliber: casingCaliber,
+                      }),
                     ]
                       .filter(Boolean)
                       .join(" · ")

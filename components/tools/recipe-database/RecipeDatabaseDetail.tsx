@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 
 import RecipeDatabaseCopyButton from "@/components/tools/recipe-database/RecipeDatabaseCopyButton";
 import { calculateRecipePayload } from "@/lib/tools/recipe-calculator";
+import { formatCasingCaliber } from "@/lib/tools/recipe-casing";
 import { RECIPE_TYPE_SUMMARY_LABELS } from "@/lib/tools/recipe-database-labels";
 import { REFERENCE_BASIS_LABELS } from "@/lib/tools/recipe-labels";
 import {
@@ -219,8 +220,9 @@ export default function RecipeDatabaseDetail({
           <SectionTitle>Därme</SectionTitle>
           <p className="mt-3 text-sm text-aw-cream">
             {recipe.payload.casing.casingType}
-            {recipe.payload.casing.caliberMm !== undefined &&
-              ` · ${recipe.payload.casing.caliberMm} mm`}
+            {formatCasingCaliber(recipe.payload.casing)
+              ? ` · ${formatCasingCaliber(recipe.payload.casing)}`
+              : ""}
           </p>
         </section>
       )}

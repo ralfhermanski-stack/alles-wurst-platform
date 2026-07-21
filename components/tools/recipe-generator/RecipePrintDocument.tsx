@@ -4,6 +4,7 @@ import {
   RECIPE_PDF_WATERMARK_SRC,
   type RecipePdfData,
 } from "@/lib/tools/recipe-pdf-data";
+import { formatCasingCaliber } from "@/lib/tools/recipe-casing";
 import {
   DEFAULT_RECIPE_PDF_SETTINGS,
   type RecipePdfSettings,
@@ -392,7 +393,7 @@ export default function RecipePrintDocument({
       <section className="mt-8 break-inside-avoid">
         <SectionTitle>Därme</SectionTitle>
         {!casing?.casingType?.trim() &&
-        casing?.caliberMm === undefined &&
+        !formatCasingCaliber(casing ?? {}) &&
         !casing?.notes?.trim() ? (
           <EmptyHint className="mt-3">Keine Darmangaben erfasst.</EmptyHint>
         ) : (
@@ -406,9 +407,7 @@ export default function RecipePrintDocument({
             <div>
               <dt className="text-aw-muted print:text-gray-600">Kaliber</dt>
               <dd className="font-medium">
-                {casing?.caliberMm !== undefined
-                  ? `${casing.caliberMm} mm`
-                  : "—"}
+                {formatCasingCaliber(casing ?? {}) ?? "—"}
               </dd>
             </div>
             {casing?.lengthCm !== undefined && (

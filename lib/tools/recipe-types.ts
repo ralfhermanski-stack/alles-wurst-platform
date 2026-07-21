@@ -147,6 +147,11 @@ export type RecipeIngredientLine = {
 /** Hülle / Darm */
 export type RecipeCasing = {
   casingType: string;
+  /**
+   * Kaliber als Einzelwert oder Range, z. B. `"32"` oder `"28/32"`.
+   */
+  caliber?: string;
+  /** Legacy-Einzelwert in mm (weiterhin gelesen/geschrieben). */
   caliberMm?: number;
   lengthCm?: number;
   notes?: string;

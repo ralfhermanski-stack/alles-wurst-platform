@@ -428,11 +428,29 @@ export function parseRecipePayload(value: unknown): RecipePayload | null {
     } else {
       payload.casing = {
         casingType: value.casing.casingType,
+        caliber:
+          typeof value.casing.caliber === "string" &&
+          value.casing.caliber.trim()
+            ? value.casing.caliber.trim()
+            : undefined,
         caliberMm: parseOptionalNumber(value.casing.caliberMm),
         lengthCm: parseOptionalNumber(value.casing.lengthCm),
         notes:
           typeof value.casing.notes === "string" ? value.casing.notes : undefined,
       };
+
+      // Legacy: nur caliberMm vorhanden → als String spiegeln
+      if (!payload.casing.caliber && payload.casing.caliberMm !== undefined) {
+        payload.casing.caliber = String(payload.casing.caliberMm);
+      }
+
+      // Neues Format: caliber setzen, caliberMm aus erstem Wert ableiten
+      if (payload.casing.caliber && payload.casing.caliberMm === undefined) {
+        const first = parseOptionalNumber(payload.casing.caliber.split("/")[0]);
+        if (first !== undefined) {
+          payload.casing.caliberMm = first;
+        }
+      }
     }
   }
 
