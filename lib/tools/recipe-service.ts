@@ -941,3 +941,49 @@ export async function updateRecipeVisibility(
     return handlePrismaError(error);
   }
 }
+/**
+ * Speichert ein Produktbild für ein eigenes Rezept.
+ */
+export async function updateRecipeImage(
+  recipeId: string,
+  requestingUserId: string,
+  imageStorageKey: string,
+  imageFileName: string,
+): Promise<RecipeServiceResult<RecipeRecord>> {
+  if (!isValidUuid(recipeId)) {
+    return recipeFailure({
+      code: "VALIDATION_ERROR",
+      message: "Die Rezept-ID muss eine gültige UUID sein.",
+    });
+  }
+
+  try {
+    const existing = await prisma.recipe.findUnique({
+      where: { id: recipeId },
+    });
+
+    if (!existing) {
+      return recipeFailure({
+        code: "NOT_FOUND",
+        message: "Das Rezept wurde nicht gefunden.",
+      });
+    }
+
+    if (!canWriteRecipe(existing, requestingUserId)) {
+      return recipeFailure({
+        code: "FORBIDDEN",
+        message: "Du hast keine Berechtigung, das Rezeptbild zu ändern.",
+      });
+    }
+
+    const recipe = await prisma.recipe.update({
+      where: { id: recipeId },
+      data: { imageStorageKey, imageFileName },
+    });
+
+    return recipeSuccess(mapRecipeToRecord(recipe));
+  } catch (error) {
+    return handlePrismaError(error);
+  }
+}
+

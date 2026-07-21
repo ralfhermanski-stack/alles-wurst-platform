@@ -16,6 +16,8 @@ export type RecipePdfData = {
   recipe: ApiRecipe;
   calculation: RecipeCalculationResult;
   plausibilityIssues: PlausibilityIssue[];
+  imageUrl: string | null;
+  authorName: string | null;
 };
 
 export type RecipePdfDataResult =
@@ -57,7 +59,12 @@ export function buildPlausibilityContextFromRecipe(
 /**
  * Berechnet alle für den Export benötigten Daten aus einem API-Rezept.
  */
-export function prepareRecipePdfData(recipe: ApiRecipe): RecipePdfDataResult {
+export function prepareRecipePdfData(
+  recipe: ApiRecipe,
+  options?: {
+    authorName?: string | null;
+  },
+): RecipePdfDataResult {
   const calculationRun = runRecipeCalculation(recipe.payload);
 
   if ("error" in calculationRun) {
@@ -76,6 +83,8 @@ export function prepareRecipePdfData(recipe: ApiRecipe): RecipePdfDataResult {
       recipe,
       calculation: calculationRun.result,
       plausibilityIssues: plausibility.issues,
+      imageUrl: recipe.hasImage ? `/api/recipes/${recipe.id}/image` : null,
+      authorName: options?.authorName?.trim() || null,
     },
   };
 }

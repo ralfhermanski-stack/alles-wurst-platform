@@ -48,6 +48,8 @@ export type ApiRecipe = {
   payload: RecipePayload;
   version: number;
   publishedAt: string | null;
+  hasImage: boolean;
+  imageFileName: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -242,6 +244,66 @@ export async function fetchRecipeCategories(): Promise<
   ApiResponse<ApiRecipeCategory[]>
 > {
   return apiRequest<ApiRecipeCategory[]>("/api/tools/recipes/categories");
+}
+
+/** Lädt ein Produktbild für ein eigenes Rezept hoch. */
+export async function uploadRecipeImageApi(
+  id: string,
+  formData: FormData,
+): Promise<ApiResponse<ApiRecipe>> {
+  try {
+    const response = await fetch(`/api/tools/recipes/${id}/image`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+      headers: {
+        [MEMBERSHIP_ROLE_HEADER]: getMembershipRole(),
+        [MEMBERSHIP_ACCESS_BLOCKED_HEADER]: isMembershipAccessBlocked()
+          ? "1"
+          : "0",
+      },
+    });
+
+    const json: unknown = await response.json();
+
+    if (
+      typeof json === "object" &&
+      json !== null &&
+      "success" in json &&
+      json.success === true &&
+      "data" in json
+    ) {
+      return { success: true, data: json.data as ApiRecipe };
+    }
+
+    if (
+      typeof json === "object" &&
+      json !== null &&
+      "success" in json &&
+      json.success === false &&
+      "error" in json &&
+      typeof json.error === "object" &&
+      json.error !== null
+    ) {
+      return { success: false, error: json.error as ApiRecipeError };
+    }
+
+    return {
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Unerwartete Server-Antwort.",
+      },
+    };
+  } catch {
+    return {
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Netzwerkfehler — bitte Verbindung prüfen.",
+      },
+    };
+  }
 }
 
 /** Filter für die öffentliche Rezeptdatenbank */

@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 
+import RecipePdfExportDialog from "@/components/tools/recipe-generator/RecipePdfExportDialog";
 import { secondaryButtonClassName } from "@/components/tools/recipe-generator/recipe-form-classes";
 
 type RecipePdfExportButtonProps = {
@@ -23,38 +24,37 @@ export default function RecipePdfExportButton({
   className,
   disabled = false,
 }: RecipePdfExportButtonProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  function handleExport() {
-    setError(null);
-
-    const url = `/werkstatt/rezeptgenerator/${recipeId}/export?auto=1`;
-    const popup = window.open(url, "_blank", "noopener,noreferrer");
-
-    if (!popup) {
-      setError(
-        "Pop-up blockiert — bitte Pop-ups erlauben oder die Exportseite manuell öffnen.",
-      );
-    }
-  }
 
   const buttonClassName = className ?? secondaryButtonClassName;
 
   return (
-    <div className="inline-flex flex-col items-start gap-2">
-      <button
-        type="button"
-        className={buttonClassName}
-        disabled={disabled || !recipeId}
-        onClick={handleExport}
-      >
-        PDF exportieren
-      </button>
-      {error && (
-        <p className="text-xs text-aw-warning" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
+    <>
+      <div className="inline-flex flex-col items-start gap-2">
+        <button
+          type="button"
+          className={buttonClassName}
+          disabled={disabled || !recipeId}
+          onClick={() => {
+            setError(null);
+            setDialogOpen(true);
+          }}
+        >
+          PDF exportieren
+        </button>
+        {error && (
+          <p className="text-xs text-aw-warning" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+
+      <RecipePdfExportDialog
+        open={dialogOpen}
+        recipeId={recipeId}
+        onClose={() => setDialogOpen(false)}
+      />
+    </>
   );
 }

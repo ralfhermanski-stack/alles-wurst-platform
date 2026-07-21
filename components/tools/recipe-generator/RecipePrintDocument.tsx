@@ -143,7 +143,7 @@ export default function RecipePrintDocument({
   data,
   pdfSettings = DEFAULT_RECIPE_PDF_SETTINGS,
 }: RecipePrintDocumentProps) {
-  const { recipe, calculation, plausibilityIssues } = data;
+  const { recipe, calculation, plausibilityIssues, imageUrl, authorName } = data;
   const { payload } = recipe;
   const casing = payload.casing;
   const production = payload.production;
@@ -154,9 +154,9 @@ export default function RecipePrintDocument({
     <article className="recipe-print-document mx-auto max-w-[210mm] bg-aw-bg px-6 py-8 text-aw-cream print:bg-white print:px-0 print:py-0 print:text-gray-900">
       <header className="border-b border-aw-gold/30 pb-6 print:border-[#8b6914]">
         <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="flex items-start gap-5">
+          <div className="flex min-w-0 flex-1 items-start gap-5">
             <div
-              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-aw-gold/40 bg-aw-surface-2 text-xs text-aw-muted print:border-[#8b6914] print:bg-gray-100 print:text-gray-500"
+              className="flex h-28 w-36 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-aw-gold/40 bg-aw-surface-2 text-xs text-aw-muted print:border-[#8b6914] print:bg-gray-100 print:text-gray-500"
               aria-label={pdfSettings.pdfLogoUrl ? "PDF-Logo" : "Logo-Platzhalter"}
             >
               {pdfSettings.pdfLogoUrl ? (
@@ -164,13 +164,13 @@ export default function RecipePrintDocument({
                 <img
                   src={pdfSettings.pdfLogoUrl}
                   alt="Logo"
-                  className="h-full w-full object-contain p-1"
+                  className="h-full w-full object-contain p-2"
                 />
               ) : (
                 pdfSettings.pdfLogoPlaceholder
               )}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-aw-bronze print:text-[#8a5a30]">
                 {pdfSettings.pdfHeaderText}
               </p>
@@ -180,8 +180,31 @@ export default function RecipePrintDocument({
               <p className="mt-2 text-sm text-aw-muted print:text-gray-600">
                 Kategorie: {recipe.category?.trim() || "—"}
               </p>
+              {authorName && (
+                <p className="mt-2 text-sm text-aw-cream print:text-gray-800">
+                  Erstellt von{" "}
+                  <span className="font-semibold text-aw-gold print:text-[#8b6914]">
+                    {authorName}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
+
+          {imageUrl ? (
+            <figure className="w-full max-w-[11rem] shrink-0 sm:w-auto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl}
+                alt={`Produktbild: ${recipe.name}`}
+                className="h-36 w-full rounded-xl border border-aw-border object-cover print:border-gray-300"
+              />
+              <figcaption className="mt-1 text-[10px] text-aw-muted print:text-gray-500">
+                Produktbild
+              </figcaption>
+            </figure>
+          ) : null}
+
           <dl className="min-w-[12rem] space-y-2 rounded-xl border border-aw-border bg-aw-surface/60 p-4 text-sm print:border-gray-300 print:bg-gray-50">
             <MetaRow
               label="Gesamtgewicht"

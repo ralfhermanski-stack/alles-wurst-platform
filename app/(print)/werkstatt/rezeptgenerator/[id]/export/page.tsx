@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import RecipePdfExportView from "@/components/tools/recipe-generator/RecipePdfExportView";
+import { parseRecipePdfAuthorDisplay } from "@/lib/tools/recipe-pdf-author";
 
 export const metadata: Metadata = {
   title: "Rezept PDF",
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 
 type RecipeExportPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ auto?: string }>;
+  searchParams: Promise<{ auto?: string; author?: string }>;
 };
 
 /**
@@ -20,7 +21,13 @@ export default async function RecipeExportPage({
   searchParams,
 }: RecipeExportPageProps) {
   const { id } = await params;
-  const { auto } = await searchParams;
+  const { auto, author } = await searchParams;
 
-  return <RecipePdfExportView recipeId={id} autoPrint={auto === "1"} />;
+  return (
+    <RecipePdfExportView
+      recipeId={id}
+      autoPrint={auto === "1"}
+      authorDisplay={parseRecipePdfAuthorDisplay(author)}
+    />
+  );
 }

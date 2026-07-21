@@ -34,6 +34,7 @@ import {
   updateRecipeApi,
   updateRecipeStatusApi,
   updateRecipeVisibilityApi,
+  uploadRecipeImageApi,
 } from "@/lib/tools/recipe-client";
 import {
   fetchAdminRecipe,
@@ -84,7 +85,7 @@ export default function RecipeGeneratorWizard({
   const router = useRouter();
   const { user } = useAuth();
   const showDatabaseFlags =
-    !adminMode && user?.profile?.publicName === "Fleischermeister_Ralf";
+    user?.profile?.publicName === "Fleischermeister_Ralf";
   const [recipeId, setRecipeId] = useState<string | undefined>(initialRecipeId);
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(Boolean(initialRecipeId));
@@ -138,7 +139,9 @@ export default function RecipeGeneratorWizard({
     const formData = new FormData();
     formData.set("file", file);
 
-    const response = await uploadAdminRecipeImageApi(recipeId, formData);
+    const response = adminMode
+      ? await uploadAdminRecipeImageApi(recipeId, formData)
+      : await uploadRecipeImageApi(recipeId, formData);
     setImageUploading(false);
 
     if (!response.success) {
@@ -662,57 +665,56 @@ export default function RecipeGeneratorWizard({
               </p>
             </div>
 
-            {adminMode && (
-              <div>
-                <label className={labelClassName}>Produktbild</label>
-                {recipeId ? (
-                  <>
-                    <p className="mt-1 text-xs text-aw-muted">
-                      Bild des Rezepts (JPG, PNG oder WebP).
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-4">
-                      {hasImage && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/recipes/${recipeId}/image?v=${imageVersion}`}
-                          alt="Rezeptbild"
-                          className="h-24 w-40 rounded-lg border border-aw-border object-cover"
-                        />
-                      )}
-                      <div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="text-sm text-aw-muted"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-
-                            if (file) {
-                              void handleImageUpload(file);
-                            }
-                          }}
-                        />
-                        {imageUploading && (
-                          <p className="mt-2 text-xs text-aw-muted">
-                            Bild wird hochgeladen …
-                          </p>
-                        )}
-                        {imageFileName && (
-                          <p className="mt-2 text-xs text-aw-muted">
-                            Aktuell: {imageFileName}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
+            <div>
+              <label className={labelClassName}>Produktbild</label>
+              {recipeId ? (
+                <>
                   <p className="mt-1 text-xs text-aw-muted">
-                    Speichere das Rezept zuerst, danach kannst du ein Bild
-                    hochladen.
+                    Erscheint im PDF-Export und auf geteilten Rezeptseiten (JPG,
+                    PNG oder WebP).
                   </p>
-                )}
-              </div>
-            )}
+                  <div className="mt-3 flex flex-wrap items-center gap-4">
+                    {hasImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/recipes/${recipeId}/image?v=${imageVersion}`}
+                        alt="Rezeptbild"
+                        className="h-32 w-48 rounded-lg border border-aw-border object-cover"
+                      />
+                    )}
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="text-sm text-aw-muted"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+
+                          if (file) {
+                            void handleImageUpload(file);
+                          }
+                        }}
+                      />
+                      {imageUploading && (
+                        <p className="mt-2 text-xs text-aw-muted">
+                          Bild wird hochgeladen …
+                        </p>
+                      )}
+                      {imageFileName && (
+                        <p className="mt-2 text-xs text-aw-muted">
+                          Aktuell: {imageFileName}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-aw-muted">
+                  Speichere das Rezept zuerst, danach kannst du ein Bild
+                  hochladen.
+                </p>
+              )}
+            </div>
           </div>
         );
 
