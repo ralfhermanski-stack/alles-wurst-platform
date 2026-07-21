@@ -179,6 +179,34 @@ export async function updateAdminRecipeSettingsApi(input: {
   );
 }
 
+/** PDF-Logo hochladen (multipart/form-data, Feld: file) */
+export async function uploadAdminRecipePdfLogoApi(
+  file: File,
+): Promise<ApiResponse<RecipeGeneratorSettingsRecord>> {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  return adminRequest<RecipeGeneratorSettingsRecord>(
+    "/api/admin/settings/recipe-generator/logo",
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}
+
+/** PDF-Logo entfernen */
+export async function removeAdminRecipePdfLogoApi(): Promise<
+  ApiResponse<RecipeGeneratorSettingsRecord>
+> {
+  return adminRequest<RecipeGeneratorSettingsRecord>(
+    "/api/admin/settings/recipe-generator/logo",
+    {
+      method: "DELETE",
+    },
+  );
+}
+
 /** Prüft, ob der Admin-Token vom Server akzeptiert wird */
 export async function verifyAdminTokenApi(): Promise<ApiResponse<{ ok: true }>> {
   return adminRequest<{ ok: true }>("/api/admin/session");

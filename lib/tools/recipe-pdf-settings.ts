@@ -7,6 +7,7 @@ export type RecipePdfSettings = {
   pdfHeaderText: string;
   pdfFooterText: string;
   pdfLogoPlaceholder: string;
+  pdfLogoUrl: string | null;
   pdfLegalNotice: string;
 };
 
@@ -14,6 +15,7 @@ export const DEFAULT_RECIPE_PDF_SETTINGS: RecipePdfSettings = {
   pdfHeaderText: "Alles-Wurst Rezeptgenerator",
   pdfFooterText: "Erstellt mit dem Alles-Wurst Rezeptgenerator",
   pdfLogoPlaceholder: "Logo",
+  pdfLogoUrl: null,
   pdfLegalNotice: "",
 };
 
@@ -41,6 +43,7 @@ export async function fetchRecipePdfSettings(): Promise<RecipePdfSettings> {
         pdfFooterText: data.pdfFooterText || DEFAULT_RECIPE_PDF_SETTINGS.pdfFooterText,
         pdfLogoPlaceholder:
           data.pdfLogoPlaceholder || DEFAULT_RECIPE_PDF_SETTINGS.pdfLogoPlaceholder,
+        pdfLogoUrl: data.pdfLogoUrl ?? null,
         pdfLegalNotice: data.pdfLegalNotice ?? "",
       };
     }

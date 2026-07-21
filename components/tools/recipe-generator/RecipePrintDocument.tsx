@@ -156,10 +156,19 @@ export default function RecipePrintDocument({
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="flex items-start gap-5">
             <div
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-aw-gold/40 bg-aw-surface-2 text-xs text-aw-muted print:border-[#8b6914] print:bg-gray-100 print:text-gray-500"
-              aria-label="Logo-Platzhalter"
+              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-aw-gold/40 bg-aw-surface-2 text-xs text-aw-muted print:border-[#8b6914] print:bg-gray-100 print:text-gray-500"
+              aria-label={pdfSettings.pdfLogoUrl ? "PDF-Logo" : "Logo-Platzhalter"}
             >
-              {pdfSettings.pdfLogoPlaceholder}
+              {pdfSettings.pdfLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={pdfSettings.pdfLogoUrl}
+                  alt="Logo"
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                pdfSettings.pdfLogoPlaceholder
+              )}
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-aw-bronze print:text-[#8a5a30]">

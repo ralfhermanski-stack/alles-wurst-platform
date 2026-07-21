@@ -12,14 +12,29 @@ import {
   deleteAdminCategoryApi,
   fetchAdminCategories,
   fetchAdminRecipeSettings,
+  removeAdminRecipePdfLogoApi,
   updateAdminCategoryApi,
   updateAdminRecipeSettingsApi,
+  uploadAdminRecipePdfLogoApi,
 } from "@/lib/admin/admin-client";
 import type { RecipeCategoryRecord } from "@/lib/admin/admin-category-service";
 import type { RecipeGeneratorSettingsRecord } from "@/lib/admin/admin-settings-service";
+import {
+  primaryButtonClassName,
+  secondaryButtonClassName,
+} from "@/components/tools/recipe-generator/recipe-form-classes";
 
 const inputClassName =
   "w-full rounded-lg border border-aw-border bg-aw-bg px-3 py-2 text-sm text-aw-cream";
+
+function logoPreviewUrl(url: string | null, version: number): string | null {
+  if (!url) {
+    return null;
+  }
+
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}v=${version}`;
+}
 
 export default function AdminGeneratorSettings() {
   const [settings, setSettings] = useState<RecipeGeneratorSettingsRecord | null>(
@@ -28,6 +43,8 @@ export default function AdminGeneratorSettings() {
   const [categories, setCategories] = useState<RecipeCategoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoVersion, setLogoVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -98,6 +115,44 @@ export default function AdminGeneratorSettings() {
     setSuccess("PDF-Einstellungen gespeichert.");
   }
 
+  async function handleLogoUpload(file: File) {
+    setLogoUploading(true);
+    setError(null);
+    setSuccess(null);
+
+    const response = await uploadAdminRecipePdfLogoApi(file);
+
+    setLogoUploading(false);
+
+    if (!response.success) {
+      setError(response.error.message);
+      return;
+    }
+
+    setSettings(response.data);
+    setLogoVersion((prev) => prev + 1);
+    setSuccess("PDF-Logo hochgeladen.");
+  }
+
+  async function handleLogoRemove() {
+    setLogoUploading(true);
+    setError(null);
+    setSuccess(null);
+
+    const response = await removeAdminRecipePdfLogoApi();
+
+    setLogoUploading(false);
+
+    if (!response.success) {
+      setError(response.error.message);
+      return;
+    }
+
+    setSettings(response.data);
+    setLogoVersion((prev) => prev + 1);
+    setSuccess("PDF-Logo entfernt.");
+  }
+
   async function addCategory() {
     const name = newCategoryName.trim();
 
@@ -160,6 +215,10 @@ export default function AdminGeneratorSettings() {
     );
   }
 
+  const logoPreview = settings
+    ? logoPreviewUrl(settings.pdfLogoUrl, logoVersion)
+    : null;
+
   return (
     <div className="p-6 sm:p-8">
       <h1 className="font-display text-2xl font-bold text-aw-cream">
@@ -215,6 +274,61 @@ export default function AdminGeneratorSettings() {
                   })
                 }
               />
+              <p className="mt-1 text-xs text-aw-muted">
+                Wird angezeigt, wenn kein Logo-Bild hochgeladen ist.
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-semibold text-aw-cream">
+                PDF-Logo
+              </label>
+              {logoPreview && (
+                <div className="mt-2 overflow-hidden rounded-lg border border-aw-border bg-aw-bg">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={logoPreview}
+                    alt="PDF-Logo"
+                    className="mx-auto max-h-24 w-auto object-contain p-4"
+                  />
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <label className={secondaryButtonClassName}>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    disabled={logoUploading || saving}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+
+                      if (file) {
+                        void handleLogoUpload(file);
+                      }
+
+                      event.target.value = "";
+                    }}
+                  />
+                  {logoUploading
+                    ? "Wird hochgeladen …"
+                    : logoPreview
+                      ? "Logo ersetzen"
+                      : "Logo hochladen"}
+                </label>
+                {logoPreview && (
+                  <button
+                    type="button"
+                    className={secondaryButtonClassName}
+                    disabled={logoUploading || saving}
+                    onClick={() => void handleLogoRemove()}
+                  >
+                    Logo entfernen
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-aw-muted">
+                JPEG, PNG oder WebP, maximal 5 MB.
+              </p>
             </div>
             <div className="sm:col-span-2">
               <label className="text-sm font-semibold text-aw-cream">
@@ -244,8 +358,8 @@ export default function AdminGeneratorSettings() {
           </div>
           <button
             type="button"
-            disabled={saving}
-            className="mt-4 rounded-lg bg-aw-gold px-5 py-2.5 text-sm font-semibold text-aw-bg hover:bg-aw-cream disabled:opacity-50"
+            disabled={saving || logoUploading}
+            className={`${primaryButtonClassName} mt-4`}
             onClick={() => void saveSettings()}
           >
             PDF-Einstellungen speichern

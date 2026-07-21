@@ -250,6 +250,9 @@ model RecipeGeneratorSettings {
   pdfHeaderText      String   @default("Alles-Wurst Rezeptgenerator") @map("pdf_header_text")
   pdfFooterText      String   @default("Erstellt mit dem Alles-Wurst Rezeptgenerator") @map("pdf_footer_text")
   pdfLogoPlaceholder String   @default("Logo") @map("pdf_logo_placeholder")
+  pdfLogoStorageKey  String?  @map("pdf_logo_storage_key")
+  pdfLogoFileName    String?  @map("pdf_logo_file_name")
+  pdfLogoMimeType    String?  @map("pdf_logo_mime_type")
   pdfLegalNotice     String   @default("") @map("pdf_legal_notice") @db.Text
   updatedAt          DateTime @updatedAt @map("updated_at")
 

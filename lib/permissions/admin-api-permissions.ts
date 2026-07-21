@@ -46,6 +46,7 @@ export const ADMIN_API_PERMISSIONS: AdminApiPermissionDef[] = [
   { pathPrefix: "/api/admin/werkstatt/produktempfehlungen", permissionKey: "admin.product-recommendations.view" },
   { pathPrefix: "/api/admin/security", permissionKey: "admin.security.view" },
   { pathPrefix: "/api/admin/einstellungen/partnerprogramme", permissionKey: "admin.product-recommendations.manage" },
+  { pathPrefix: "/api/admin/settings/recipe-generator", permissionKey: "admin.workshop-settings.view" },
   { pathPrefix: "/api/admin/werkstatt", permissionKey: "admin.workshop-settings.view" },
   { pathPrefix: "/api/admin/knowledge-base", permissionKey: "admin.tickets.view" },
   { pathPrefix: "/api/admin/dashboard", permissionKey: "admin.dashboard.view" },

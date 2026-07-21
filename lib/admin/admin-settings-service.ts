@@ -9,6 +9,11 @@ import {
   recipeSuccess,
   type RecipeServiceResult,
 } from "@/lib/tools/recipe-errors";
+import {
+  deleteRecipePdfLogoFile,
+  getRecipePdfLogoPublicUrl,
+  saveRecipePdfLogo,
+} from "@/lib/tools/recipe-pdf-logo-storage";
 
 const SETTINGS_ID = "default";
 
@@ -16,6 +21,7 @@ export type RecipeGeneratorSettingsRecord = {
   pdfHeaderText: string;
   pdfFooterText: string;
   pdfLogoPlaceholder: string;
+  pdfLogoUrl: string | null;
   pdfLegalNotice: string;
   updatedAt: string;
 };
@@ -31,6 +37,7 @@ function mapSettings(row: {
   pdfHeaderText: string;
   pdfFooterText: string;
   pdfLogoPlaceholder: string;
+  pdfLogoStorageKey: string | null;
   pdfLegalNotice: string;
   updatedAt: Date;
 }): RecipeGeneratorSettingsRecord {
@@ -38,6 +45,7 @@ function mapSettings(row: {
     pdfHeaderText: row.pdfHeaderText,
     pdfFooterText: row.pdfFooterText,
     pdfLogoPlaceholder: row.pdfLogoPlaceholder,
+    pdfLogoUrl: row.pdfLogoStorageKey ? getRecipePdfLogoPublicUrl() : null,
     pdfLegalNotice: row.pdfLegalNotice,
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -52,6 +60,14 @@ function handleError(error: unknown): RecipeServiceResult<never> {
   });
 }
 
+async function ensureSettings() {
+  return prisma.recipeGeneratorSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: { id: SETTINGS_ID },
+    update: {},
+  });
+}
+
 /**
  * Lädt die globalen Rezeptgenerator-Einstellungen (legt Defaults an, falls leer).
  */
@@ -59,16 +75,30 @@ export async function getRecipeGeneratorSettings(): Promise<
   RecipeServiceResult<RecipeGeneratorSettingsRecord>
 > {
   try {
-    const settings = await prisma.recipeGeneratorSettings.upsert({
-      where: { id: SETTINGS_ID },
-      create: { id: SETTINGS_ID },
-      update: {},
-    });
-
+    const settings = await ensureSettings();
     return recipeSuccess(mapSettings(settings));
   } catch (error) {
     return handleError(error);
   }
+}
+
+/**
+ * Metadaten für die öffentliche Logo-Auslieferung.
+ */
+export async function getRecipePdfLogoMeta(): Promise<{
+  storageKey: string;
+  mimeType: string;
+} | null> {
+  const row = await ensureSettings();
+
+  if (!row.pdfLogoStorageKey || !row.pdfLogoMimeType) {
+    return null;
+  }
+
+  return {
+    storageKey: row.pdfLogoStorageKey,
+    mimeType: row.pdfLogoMimeType,
+  };
 }
 
 /**
@@ -131,6 +161,75 @@ export async function updateRecipeGeneratorSettings(
       },
       update: data,
     });
+
+    return recipeSuccess(mapSettings(settings));
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+/**
+ * Speichert ein neues PDF-Logo und ersetzt ggf. das bisherige.
+ */
+export async function uploadRecipePdfLogo(
+  fileName: string,
+  mimeType: string,
+  bytes: Uint8Array,
+): Promise<RecipeServiceResult<RecipeGeneratorSettingsRecord>> {
+  try {
+    const existing = await ensureSettings();
+    const saved = await saveRecipePdfLogo(fileName, mimeType, bytes);
+
+    const settings = await prisma.recipeGeneratorSettings.update({
+      where: { id: SETTINGS_ID },
+      data: {
+        pdfLogoStorageKey: saved.storageKey,
+        pdfLogoFileName: saved.fileName,
+        pdfLogoMimeType: saved.mimeType,
+      },
+    });
+
+    await deleteRecipePdfLogoFile(existing.pdfLogoStorageKey);
+
+    return recipeSuccess(mapSettings(settings));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("erlaubt")) {
+      return recipeFailure({
+        code: "VALIDATION_ERROR",
+        message: error.message,
+      });
+    }
+
+    if (error instanceof Error && error.message.includes("MB")) {
+      return recipeFailure({
+        code: "VALIDATION_ERROR",
+        message: error.message,
+      });
+    }
+
+    return handleError(error);
+  }
+}
+
+/**
+ * Entfernt das PDF-Logo.
+ */
+export async function removeRecipePdfLogo(): Promise<
+  RecipeServiceResult<RecipeGeneratorSettingsRecord>
+> {
+  try {
+    const existing = await ensureSettings();
+
+    const settings = await prisma.recipeGeneratorSettings.update({
+      where: { id: SETTINGS_ID },
+      data: {
+        pdfLogoStorageKey: null,
+        pdfLogoFileName: null,
+        pdfLogoMimeType: null,
+      },
+    });
+
+    await deleteRecipePdfLogoFile(existing.pdfLogoStorageKey);
 
     return recipeSuccess(mapSettings(settings));
   } catch (error) {
