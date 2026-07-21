@@ -14,6 +14,8 @@ type RecipePdfExportButtonProps = {
   recipeId: string;
   className?: string;
   disabled?: boolean;
+  /** Speichert aktuelle Wizard-Daten vor dem Export (inkl. Därme). */
+  onBeforeExport?: () => Promise<boolean>;
 };
 
 /**
@@ -23,11 +25,32 @@ export default function RecipePdfExportButton({
   recipeId,
   className,
   disabled = false,
+  onBeforeExport,
 }: RecipePdfExportButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const buttonClassName = className ?? secondaryButtonClassName;
+
+  async function handleOpen() {
+    setError(null);
+
+    if (onBeforeExport) {
+      setPreparing(true);
+      const ok = await onBeforeExport();
+      setPreparing(false);
+
+      if (!ok) {
+        setError(
+          "Bitte speichere das Rezept zuerst — sonst fehlen aktuelle Angaben (z. B. Därme) im PDF.",
+        );
+        return;
+      }
+    }
+
+    setDialogOpen(true);
+  }
 
   return (
     <>
@@ -35,13 +58,12 @@ export default function RecipePdfExportButton({
         <button
           type="button"
           className={buttonClassName}
-          disabled={disabled || !recipeId}
+          disabled={disabled || !recipeId || preparing}
           onClick={() => {
-            setError(null);
-            setDialogOpen(true);
+            void handleOpen();
           }}
         >
-          PDF exportieren
+          {preparing ? "Wird gespeichert …" : "PDF exportieren"}
         </button>
         {error && (
           <p className="text-xs text-aw-warning" role="alert">

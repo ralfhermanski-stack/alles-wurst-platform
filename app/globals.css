@@ -88,7 +88,9 @@ body {
   }
 
   .recipe-print-watermark {
-    opacity: 0.1 !important;
+    opacity: 0.22 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .recipe-print-footer {

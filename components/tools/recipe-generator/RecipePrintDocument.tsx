@@ -146,7 +146,14 @@ export default function RecipePrintDocument({
   data,
   pdfSettings = DEFAULT_RECIPE_PDF_SETTINGS,
 }: RecipePrintDocumentProps) {
-  const { recipe, calculation, plausibilityIssues, imageUrl, authorName } = data;
+  const {
+    recipe,
+    calculation,
+    plausibilityIssues,
+    imageUrl,
+    watermarkUrl,
+    authorName,
+  } = data;
   const { payload } = recipe;
   const casing = payload.casing;
   const production = payload.production;
@@ -154,16 +161,16 @@ export default function RecipePrintDocument({
   const schuettung = payload.schuettung;
 
   return (
-    <article className="recipe-print-document relative mx-auto max-w-[210mm] overflow-hidden bg-aw-bg px-6 py-8 text-aw-cream print:bg-white print:px-0 print:py-0 print:text-gray-900">
+    <article className="recipe-print-document relative mx-auto max-w-[210mm] bg-aw-bg px-6 py-8 text-aw-cream print:overflow-visible print:bg-white print:px-0 print:py-0 print:text-gray-900">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
+        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-visible print:fixed print:inset-0"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={RECIPE_PDF_WATERMARK_SRC}
+          src={watermarkUrl || RECIPE_PDF_WATERMARK_SRC}
           alt=""
-          className="recipe-print-watermark w-[72%] max-w-[150mm] -rotate-[28deg] select-none opacity-[0.11] print:opacity-[0.1]"
+          className="recipe-print-watermark w-[78%] max-w-[170mm] -rotate-[28deg] select-none opacity-[0.28] print:opacity-[0.22]"
         />
       </div>
 

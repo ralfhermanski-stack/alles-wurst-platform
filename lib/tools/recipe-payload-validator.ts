@@ -409,18 +409,20 @@ export function parseRecipePayload(value: unknown): RecipePayload | null {
 
   if (value.casing !== undefined) {
     if (!isRecord(value.casing) || !isNonEmptyString(value.casing.casingType)) {
-      return null;
+      // Ungültige Darmangaben verwerfen — Rest des Payloads bleibt gültig.
+    } else {
+      payload.casing = {
+        casingType: value.casing.casingType,
+        caliberMm: isFiniteNumber(value.casing.caliberMm)
+          ? value.casing.caliberMm
+          : undefined,
+        lengthCm: isFiniteNumber(value.casing.lengthCm)
+          ? value.casing.lengthCm
+          : undefined,
+        notes:
+          typeof value.casing.notes === "string" ? value.casing.notes : undefined,
+      };
     }
-    payload.casing = {
-      casingType: value.casing.casingType,
-      caliberMm: isFiniteNumber(value.casing.caliberMm)
-        ? value.casing.caliberMm
-        : undefined,
-      lengthCm: isFiniteNumber(value.casing.lengthCm)
-        ? value.casing.lengthCm
-        : undefined,
-      notes: typeof value.casing.notes === "string" ? value.casing.notes : undefined,
-    };
   }
 
   if (value.production !== undefined) {

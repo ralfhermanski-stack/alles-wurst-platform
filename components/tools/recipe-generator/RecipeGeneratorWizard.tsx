@@ -1127,6 +1127,19 @@ export default function RecipeGeneratorWizard({
                 {category || "Keine Kategorie"} · {meats.length} Fleischzeile(n) ·{" "}
                 {ingredients.length} Zutat(en)
               </p>
+              <p className="mt-2 text-sm text-aw-cream">
+                Därme:{" "}
+                {casingType.trim()
+                  ? [
+                      casingType.trim(),
+                      casingCaliber.trim()
+                        ? `Kaliber ${casingCaliber.trim()} mm`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "noch nicht erfasst"}
+              </p>
               {description && (
                 <p className="mt-3 text-sm text-aw-cream">{description}</p>
               )}
@@ -1216,7 +1229,17 @@ export default function RecipeGeneratorWizard({
 
             <div className="flex flex-wrap gap-3">
               {recipeId && !adminMode && (
-                <RecipePdfExportButton recipeId={recipeId} />
+                <RecipePdfExportButton
+                  recipeId={recipeId}
+                  disabled={saving}
+                  onBeforeExport={async () =>
+                    persistRecipe(
+                      status === RecipeStatus.draft
+                        ? RecipeStatus.draft
+                        : status,
+                    )
+                  }
+                />
               )}
               {recipeId && !adminMode && status === RecipeStatus.saved && (
                 <ShareButton

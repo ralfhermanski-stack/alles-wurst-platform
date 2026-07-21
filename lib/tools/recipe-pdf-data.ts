@@ -25,6 +25,7 @@ export type RecipePdfData = {
   calculation: RecipeCalculationResult;
   plausibilityIssues: PlausibilityIssue[];
   imageUrl: string | null;
+  watermarkUrl: string;
   authorName: string | null;
 };
 
@@ -94,18 +95,10 @@ async function blobToPrintDataUrl(
   return canvas.toDataURL("image/jpeg", 0.86);
 }
 
-/**
- * Lädt das Produktbild und bereitet es für den Druck/PDF-Export vor.
- * Liefert eine eingebettete Data-URL (kein zusätzlicher Netz-Request beim Drucken).
- */
-export async function resolveRecipePdfImageUrl(
-  recipe: Pick<ApiRecipe, "id" | "hasImage">,
-): Promise<string | null> {
-  if (!recipe.hasImage) {
-    return null;
-  }
-
-  const path = getRecipeImagePublicPath(recipe.id);
+async function resolvePublicAssetForPrint(
+  path: string,
+  options?: { asJpeg?: boolean; maxEdgePx?: number },
+): Promise<string> {
   const absoluteUrl =
     typeof window !== "undefined"
       ? new URL(path, window.location.origin).href
@@ -123,13 +116,57 @@ export async function resolveRecipePdfImageUrl(
 
     const blob = await response.blob();
 
-    try {
-      return await blobToPrintDataUrl(blob);
-    } catch {
-      return URL.createObjectURL(blob);
+    if (options?.asJpeg) {
+      try {
+        return await blobToPrintDataUrl(blob, options.maxEdgePx ?? 900);
+      } catch {
+        return URL.createObjectURL(blob);
+      }
     }
+
+    // Wasserzeichen: PNG mit Alpha als Data-URL behalten
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+          return;
+        }
+        reject(new Error("Data-URL fehlgeschlagen."));
+      };
+      reader.onerror = () => reject(new Error("Asset konnte nicht gelesen werden."));
+      reader.readAsDataURL(blob);
+    });
   } catch {
     return absoluteUrl;
+  }
+}
+
+/**
+ * Lädt das Produktbild und bereitet es für den Druck/PDF-Export vor.
+ * Liefert eine eingebettete Data-URL (kein zusätzlicher Netz-Request beim Drucken).
+ */
+export async function resolveRecipePdfImageUrl(
+  recipe: Pick<ApiRecipe, "id" | "hasImage">,
+): Promise<string | null> {
+  if (!recipe.hasImage) {
+    return null;
+  }
+
+  return resolvePublicAssetForPrint(getRecipeImagePublicPath(recipe.id), {
+    asJpeg: true,
+    maxEdgePx: 900,
+  });
+}
+
+/**
+ * Lädt das Crest-Wasserzeichen als eingebettete Data-URL für den Druck.
+ */
+export async function resolveRecipePdfWatermarkUrl(): Promise<string> {
+  try {
+    return await resolvePublicAssetForPrint(RECIPE_PDF_WATERMARK_SRC);
+  } catch {
+    return RECIPE_PDF_WATERMARK_SRC;
   }
 }
 
@@ -168,6 +205,7 @@ export function prepareRecipePdfData(
   options?: {
     authorName?: string | null;
     imageUrl?: string | null;
+    watermarkUrl?: string | null;
   },
 ): RecipePdfDataResult {
   const calculationRun = runRecipeCalculation(recipe.payload);
@@ -196,6 +234,7 @@ export function prepareRecipePdfData(
       calculation: calculationRun.result,
       plausibilityIssues: plausibility.issues,
       imageUrl: resolvedImageUrl,
+      watermarkUrl: options?.watermarkUrl?.trim() || RECIPE_PDF_WATERMARK_SRC,
       authorName: options?.authorName?.trim() || null,
     },
   };

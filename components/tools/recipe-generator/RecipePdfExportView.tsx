@@ -17,6 +17,7 @@ import { fetchRecipe } from "@/lib/tools/recipe-client";
 import {
   prepareRecipePdfData,
   resolveRecipePdfImageUrl,
+  resolveRecipePdfWatermarkUrl,
   waitForRecipePrintImages,
   type RecipePdfData,
 } from "@/lib/tools/recipe-pdf-data";
@@ -183,9 +184,11 @@ export default function RecipePdfExportView({
         return;
       }
 
-      // Produktbild vor dem Druck laden und als Data-URL einbetten —
-      // sonst fehlen große Bilder oft im Druckdialog (Timing/Netzwerk).
-      const imageUrl = await resolveRecipePdfImageUrl(response.data);
+      // Produktbild + Wasserzeichen vor dem Druck einbetten
+      const [imageUrl, watermarkUrl] = await Promise.all([
+        resolveRecipePdfImageUrl(response.data),
+        resolveRecipePdfWatermarkUrl(),
+      ]);
 
       if (cancelled) {
         return;
@@ -194,6 +197,7 @@ export default function RecipePdfExportView({
       const prepared = prepareRecipePdfData(response.data, {
         authorName,
         imageUrl,
+        watermarkUrl,
       });
 
       if (!prepared.success) {
