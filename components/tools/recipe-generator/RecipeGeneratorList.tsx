@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation";
 
 import Icon from "@/components/brand/Icon";
 import MembershipBlockedNotice from "@/components/membership/MembershipBlockedNotice";
-import RecipeJsonExportButton from "@/components/tools/recipe-generator/RecipeJsonExportButton";
 import RecipeJsonImportButton from "@/components/tools/recipe-generator/RecipeJsonImportButton";
 import RecipePdfExportButton from "@/components/tools/recipe-generator/RecipePdfExportButton";
 import {
@@ -275,10 +274,6 @@ export default function RecipeGeneratorList() {
                           Öffnen
                         </button>
                         <RecipePdfExportButton recipeId={recipe.id} />
-                        <RecipeJsonExportButton
-                          recipeId={recipe.id}
-                          recipe={recipe}
-                        />
                         <button
                           type="button"
                           className={secondaryButtonClassName}

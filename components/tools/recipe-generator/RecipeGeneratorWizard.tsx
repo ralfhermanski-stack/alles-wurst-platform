@@ -15,7 +15,6 @@ import Icon from "@/components/brand/Icon";
 import { useAuth } from "@/lib/auth/use-auth";
 import RecipeLiveSummary from "@/components/tools/recipe-generator/RecipeLiveSummary";
 import RecipeCategorySelect from "@/components/tools/recipe-generator/RecipeCategorySelect";
-import RecipeJsonExportButton from "@/components/tools/recipe-generator/RecipeJsonExportButton";
 import RecipePdfExportButton from "@/components/tools/recipe-generator/RecipePdfExportButton";
 import { ShareButton } from "@/components/sharing/ShareModal";
 import RecipePlausibilityList from "@/components/tools/recipe-generator/RecipePlausibilityList";
@@ -1268,9 +1267,6 @@ export default function RecipeGeneratorWizard({
                   recipeId={recipeId}
                   title={name.trim() || "Mein Rezept"}
                 />
-              )}
-              {recipeId && !adminMode && (
-                <RecipeJsonExportButton recipeId={recipeId} />
               )}
               <button
                 type="button"
