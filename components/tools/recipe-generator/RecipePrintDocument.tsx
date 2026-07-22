@@ -18,8 +18,13 @@ import {
 import { REFERENCE_BASIS_LABELS } from "@/lib/tools/recipe-labels";
 import type { PlausibilitySeverity } from "@/lib/tools/recipe-plausibility";
 import type {
+  MeatClassification,
   RecipeProduction,
   RecipeSmokingPhase,
+} from "@/lib/tools/recipe-types";
+import {
+  SMOKING_DIMENSIONS,
+  STRUCTURE_DIMENSIONS,
 } from "@/lib/tools/recipe-types";
 
 type RecipePrintDocumentProps = {
@@ -64,6 +69,23 @@ function MetaRow({ label, value }: { label: string; value: string }) {
       <dd className="font-medium text-aw-cream print:text-gray-900">{value}</dd>
     </div>
   );
+}
+
+/**
+ * Zeigt gesetzte Klassifizierungs-Dimensionen (S1–S10 / R1–R5).
+ */
+function formatMeatClassification(classification: MeatClassification): string {
+  const parts: string[] = [];
+
+  for (const dimension of [...STRUCTURE_DIMENSIONS, ...SMOKING_DIMENSIONS]) {
+    const value = classification[dimension];
+
+    if (typeof value === "number" && value !== 0) {
+      parts.push(`${dimension}: ${formatPdfPercent(value)}`);
+    }
+  }
+
+  return parts.join(" · ");
 }
 
 function ProductionDetails({ production }: { production: RecipeProduction }) {
@@ -262,18 +284,37 @@ export default function RecipePrintDocument({
               </tr>
             </thead>
             <tbody>
-              {calculation.meatLines.map((line) => (
-                <tr
-                  key={`${line.meatType}-${line.sortOrder}`}
-                  className="border-b border-aw-border/60 print:border-gray-200"
-                >
-                  <td className="py-2.5 pr-4">{line.meatType || "—"}</td>
-                  <td className="py-2.5 pr-4">
-                    {formatPdfPercent(line.percentage)} %
-                  </td>
-                  <td className="py-2.5">{formatPdfKg(line.weightKg)} kg</td>
-                </tr>
-              ))}
+              {calculation.meatLines.map((line) => {
+                const classificationText = formatMeatClassification(
+                  line.classification,
+                );
+
+                return (
+                  <tr
+                    key={`${line.meatType}-${line.sortOrder}`}
+                    className="border-b border-aw-border/60 print:border-gray-200"
+                  >
+                    <td className="py-2.5 pr-4 align-top">
+                      <p className="font-medium">{line.meatType || "—"}</p>
+                      {classificationText ? (
+                        <p className="mt-1 text-xs text-aw-muted print:text-gray-600">
+                          Klassifizierung: {classificationText}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-aw-muted print:text-gray-500">
+                          Keine Klassifizierung erfasst
+                        </p>
+                      )}
+                    </td>
+                    <td className="py-2.5 pr-4 align-top">
+                      {formatPdfPercent(line.percentage)} %
+                    </td>
+                    <td className="py-2.5 align-top">
+                      {formatPdfKg(line.weightKg)} kg
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

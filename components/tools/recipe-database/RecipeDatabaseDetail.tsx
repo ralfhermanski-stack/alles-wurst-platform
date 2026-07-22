@@ -17,6 +17,11 @@ import {
   fetchOfficialRecipe,
   type PublicRecipeDetail,
 } from "@/lib/tools/recipe-client";
+import {
+  SMOKING_DIMENSIONS,
+  STRUCTURE_DIMENSIONS,
+  type MeatClassification,
+} from "@/lib/tools/recipe-types";
 
 type RecipeDatabaseDetailProps = {
   recipeId: string;
@@ -44,6 +49,20 @@ function SectionTitle({ children }: { children: string }) {
   return (
     <h2 className="font-display text-lg font-bold text-aw-gold">{children}</h2>
   );
+}
+
+function formatMeatClassification(classification: MeatClassification): string {
+  const parts: string[] = [];
+
+  for (const dimension of [...STRUCTURE_DIMENSIONS, ...SMOKING_DIMENSIONS]) {
+    const value = classification[dimension];
+
+    if (typeof value === "number" && value !== 0) {
+      parts.push(`${dimension}: ${formatPercent(value)}`);
+    }
+  }
+
+  return parts.join(" · ");
 }
 
 export default function RecipeDatabaseDetail({
@@ -160,17 +179,31 @@ export default function RecipeDatabaseDetail({
         <section className="rounded-xl border border-aw-border bg-aw-surface/40 p-5">
           <SectionTitle>Fleischanteile</SectionTitle>
           <ul className="mt-4 space-y-2 text-sm">
-            {calculation.meatLines.map((line) => (
-              <li
-                key={`${line.meatType}-${line.sortOrder}`}
-                className="flex justify-between gap-4 border-b border-aw-border/50 py-2 last:border-0"
-              >
-                <span>{line.meatType}</span>
-                <span className="text-aw-muted">
-                  {formatPercent(line.percentage)} % · {formatKg(line.weightKg)} kg
-                </span>
-              </li>
-            ))}
+            {calculation.meatLines.map((line) => {
+              const classificationText = formatMeatClassification(
+                line.classification,
+              );
+
+              return (
+                <li
+                  key={`${line.meatType}-${line.sortOrder}`}
+                  className="border-b border-aw-border/50 py-2 last:border-0"
+                >
+                  <div className="flex justify-between gap-4">
+                    <span>{line.meatType}</span>
+                    <span className="text-aw-muted">
+                      {formatPercent(line.percentage)} % ·{" "}
+                      {formatKg(line.weightKg)} kg
+                    </span>
+                  </div>
+                  {classificationText && (
+                    <p className="mt-1 text-xs text-aw-muted">
+                      Klassifizierung: {classificationText}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
