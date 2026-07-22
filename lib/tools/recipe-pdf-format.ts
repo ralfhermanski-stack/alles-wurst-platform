@@ -23,7 +23,7 @@ export function formatPdfPercent(value: number): string {
 export function formatPdfGrams(value: number): string {
   return new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 

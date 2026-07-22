@@ -15,6 +15,7 @@ import Icon from "@/components/brand/Icon";
 import { useAuth } from "@/lib/auth/use-auth";
 import RecipeLiveSummary from "@/components/tools/recipe-generator/RecipeLiveSummary";
 import RecipeCategorySelect from "@/components/tools/recipe-generator/RecipeCategorySelect";
+import RecipeDecimalInput from "@/components/tools/recipe-generator/RecipeDecimalInput";
 import RecipePdfExportButton from "@/components/tools/recipe-generator/RecipePdfExportButton";
 import { ShareButton } from "@/components/sharing/ShareModal";
 import RecipePlausibilityList from "@/components/tools/recipe-generator/RecipePlausibilityList";
@@ -756,17 +757,12 @@ export default function RecipeGeneratorWizard({
                   </div>
                   <div>
                     <label className={labelClassName}>Anteil %</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
+                    <RecipeDecimalInput
                       className={`${inputSmClassName} mt-1`}
-                      value={line.percentage || ""}
-                      onChange={(e) => {
+                      value={line.percentage}
+                      onChange={(percentage) => {
                         const next = [...meats];
-                        next[index] = {
-                          ...line,
-                          percentage: Number(e.target.value.replace(",", ".")) || 0,
-                        };
+                        next[index] = { ...line, percentage };
                         setMeats(next);
                       }}
                     />
@@ -783,16 +779,14 @@ export default function RecipeGeneratorWizard({
                     ].map((dim) => (
                       <div key={dim}>
                         <label className="text-xs text-aw-muted">{dim}</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
+                        <RecipeDecimalInput
                           className={`${inputSmClassName} mt-0.5`}
-                          value={line.classification[dim as keyof MeatClassification] || ""}
-                          onChange={(e) => {
+                          value={line.classification[dim as keyof MeatClassification]}
+                          onChange={(nextValue) => {
                             const next = [...meats];
                             const classification = { ...line.classification };
                             classification[dim as keyof MeatClassification] =
-                              Number(e.target.value.replace(",", ".")) || 0;
+                              nextValue;
                             next[index] = { ...line, classification };
                             setMeats(next);
                           }}
@@ -838,16 +832,14 @@ export default function RecipeGeneratorWizard({
                 </div>
                 <div>
                   <label className={labelClassName}>Anteil %</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <RecipeDecimalInput
                     className={`${inputSmClassName} mt-1`}
-                    value={line.percentage || ""}
-                    onChange={(e) => {
+                    value={line.percentage}
+                    onChange={(percentage) => {
                       const next = [...binders];
                       next[index] = {
                         ...line,
-                        percentage: Number(e.target.value.replace(",", ".")) || 0,
+                        percentage,
                       };
                       setBinders(next);
                     }}
@@ -913,17 +905,13 @@ export default function RecipeGeneratorWizard({
                 </div>
                 <div>
                   <label className={labelClassName}>Menge g/kg</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <RecipeDecimalInput
                     className={`${inputSmClassName} mt-1`}
-                    value={line.amountPerKg || ""}
-                    onChange={(e) => {
+                    value={line.amountPerKg}
+                    placeholder="z. B. 1,8"
+                    onChange={(amountPerKg) => {
                       const next = [...ingredients];
-                      next[index] = {
-                        ...line,
-                        amountPerKg: Number(e.target.value.replace(",", ".")) || 0,
-                      };
+                      next[index] = { ...line, amountPerKg };
                       setIngredients(next);
                     }}
                   />
