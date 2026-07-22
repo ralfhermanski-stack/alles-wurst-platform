@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import Icon from "@/components/brand/Icon";
 import RecipeDatabaseCopyButton from "@/components/tools/recipe-database/RecipeDatabaseCopyButton";
 import { calculateRecipePayload } from "@/lib/tools/recipe-calculator";
 import { formatCasingCaliber } from "@/lib/tools/recipe-casing";
@@ -17,6 +18,7 @@ import {
   fetchOfficialRecipe,
   type PublicRecipeDetail,
 } from "@/lib/tools/recipe-client";
+import type { RecipeLockCta } from "@/lib/tools/recipe-database-service";
 import {
   SMOKING_DIMENSIONS,
   STRUCTURE_DIMENSIONS,
@@ -26,6 +28,43 @@ import {
 type RecipeDatabaseDetailProps = {
   recipeId: string;
 };
+
+function lockCtaHref(lockCta: RecipeLockCta | null): string {
+  switch (lockCta) {
+    case "login":
+      return "/anmelden";
+    case "course":
+      return "/akademie/kurse";
+    case "membership":
+    default:
+      return "/mitgliedschaft";
+  }
+}
+
+function lockCtaLabel(lockCta: RecipeLockCta | null): string {
+  switch (lockCta) {
+    case "login":
+      return "Jetzt anmelden";
+    case "course":
+      return "Kurse entdecken";
+    case "membership":
+    default:
+      return "Mitgliedschaft wählen";
+  }
+}
+
+function lockMessage(recipe: PublicRecipeDetail): string {
+  switch (recipe.lockCta) {
+    case "login":
+      return "Dieses Rezept ist sichtbar, aber zum Öffnen brauchst du ein kostenloses Konto.";
+    case "course":
+      return "Dieses Kursrezept siehst du als Vorschau. Nach Buchung des zugehörigen Kurses kannst du es öffnen.";
+    case "membership":
+      return `Dieses Rezept gehört zur Stufe „${recipe.accessLabel}“. Mit der passenden Mitgliedschaft kannst du es vollständig öffnen.`;
+    default:
+      return "Du hast derzeit keinen Zugriff auf den vollständigen Inhalt.";
+  }
+}
 
 function formatKg(value: number): string {
   return new Intl.NumberFormat("de-DE", {
@@ -118,6 +157,58 @@ export default function RecipeDatabaseDetail({
         >
           ← Zur Rezeptdatenbank
         </Link>
+      </div>
+    );
+  }
+
+  if (!recipe.canOpen || !recipe.payload) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <Link
+            href="/werkstatt/rezeptdatenbank"
+            className="text-sm text-aw-muted hover:text-aw-gold"
+          >
+            ← Zur Rezeptdatenbank
+          </Link>
+          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-aw-bronze">
+            {recipe.accessLabel}
+          </p>
+          <h1 className="mt-2 font-display text-3xl font-bold text-aw-cream">
+            {recipe.name}
+          </h1>
+          {recipe.description && (
+            <p className="mt-4 max-w-3xl text-base leading-7 text-aw-cream/90">
+              {recipe.description}
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-aw-gold/30 bg-gradient-to-b from-aw-gold/10 to-aw-surface p-8 text-center">
+          <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-aw-surface text-aw-gold ring-1 ring-aw-gold/40">
+            <Icon name="lock" className="h-7 w-7" />
+          </span>
+          <h2 className="mt-4 font-display text-2xl font-bold text-aw-cream">
+            Inhalt gesperrt
+          </h2>
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-aw-muted">
+            {lockMessage(recipe)}
+          </p>
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href={lockCtaHref(recipe.lockCta)}
+              className="inline-flex items-center justify-center rounded-md bg-aw-gold px-6 py-3 text-sm font-semibold text-aw-bg transition-colors hover:bg-aw-gold-dark hover:text-aw-cream"
+            >
+              {lockCtaLabel(recipe.lockCta)}
+            </Link>
+            <Link
+              href="/werkstatt/rezeptdatenbank"
+              className="inline-flex items-center justify-center rounded-md px-6 py-3 text-sm font-semibold text-aw-cream ring-1 ring-aw-border transition-colors hover:bg-aw-surface-2"
+            >
+              Zurück zur Übersicht
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

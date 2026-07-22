@@ -1,6 +1,6 @@
 /**
  * @file recipe-database-service.ts
- * @purpose Öffentliche Rezeptdatenbank — nur offizielle, freigegebene Rezepte.
+ * @purpose Öffentliche Rezeptdatenbank — Teaser für alle, Detail nur mit Berechtigung.
  */
 
 import {
@@ -14,7 +14,9 @@ import { prisma } from "@/lib/db/prisma";
 import { hasActiveCourseAccess } from "@/lib/courses/course-access-service";
 import {
   checkMembershipCapability,
+  createMembershipContext,
   type MembershipAccessContext,
+  type MembershipRole,
 } from "@/lib/membership/membership-rules";
 import { guardMembershipCheck } from "@/lib/membership/membership-guard";
 import {
@@ -42,7 +44,17 @@ export type ListOfficialRecipesInput = {
   membership?: MembershipAccessContext;
 };
 
-/** Kurzdarstellung für die Rezeptdatenbank-Liste */
+/** Stufen-Hinweis auf Teaser-Karten */
+export type RecipeCatalogAccessLabel =
+  | "Rezept des Monats"
+  | "Kursrezept"
+  | "Wurstclub"
+  | "Meisterclub";
+
+/** CTA, wenn das Rezept sichtbar, aber nicht öffenbar ist */
+export type RecipeLockCta = "login" | "membership" | "course";
+
+/** Kurzdarstellung für die Rezeptdatenbank-Liste (Teaser) */
 export type PublicRecipeSummary = {
   id: string;
   name: string;
@@ -54,11 +66,16 @@ export type PublicRecipeSummary = {
   recipeType: "smoked" | "fresh";
   meatLineCount: number;
   ingredientCount: number;
+  isRecipeOfMonth: boolean;
+  hasImage: boolean;
+  canOpen: boolean;
+  accessLabel: RecipeCatalogAccessLabel;
+  lockCta: RecipeLockCta | null;
 };
 
 /** Vollständige öffentliche Detailansicht */
 export type PublicRecipeDetail = PublicRecipeSummary & {
-  payload: RecipePayload;
+  payload: RecipePayload | null;
 };
 
 const RECIPE_DB_BASE_WHERE: Prisma.RecipeWhereInput = {
@@ -103,6 +120,48 @@ function handlePrismaError(error: unknown): RecipeServiceResult<never> {
   });
 }
 
+function isRecipeInPublicCatalog(
+  recipe: Recipe,
+  ralfUserId: string | null,
+): boolean {
+  if (
+    recipe.deletedAt !== null ||
+    recipe.status !== RecipeStatus.published ||
+    recipe.recipeKind !== "wurst"
+  ) {
+    return false;
+  }
+
+  if (
+    recipe.isRecipeOfMonth &&
+    recipe.visibility === RecipeVisibility.database
+  ) {
+    return true;
+  }
+
+  if (recipe.isCourseLinked) {
+    return true;
+  }
+
+  if (recipe.visibility === RecipeVisibility.public) {
+    return true;
+  }
+
+  if (recipe.isMeisterclubSpecial) {
+    return true;
+  }
+
+  if (
+    ralfUserId &&
+    recipe.userId === ralfUserId &&
+    recipe.visibility === RecipeVisibility.database
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Leitet den Rezepttyp aus dem Payload ab (Räucherware vs. Frischware).
  */
@@ -115,8 +174,63 @@ export function deriveRecipeType(payload: RecipePayload): "smoked" | "fresh" {
   return hasSmoking ? "smoked" : "fresh";
 }
 
-function mapToPublicSummary(recipe: Recipe): PublicRecipeSummary {
+function resolveAccessLabel(
+  recipe: Recipe,
+  ralfUserId: string | null,
+): RecipeCatalogAccessLabel {
+  if (recipe.isRecipeOfMonth) {
+    return "Rezept des Monats";
+  }
+
+  if (recipe.isCourseLinked) {
+    return "Kursrezept";
+  }
+
+  if (recipe.isMeisterclubSpecial) {
+    return "Meisterclub";
+  }
+
+  if (recipe.visibility === RecipeVisibility.public) {
+    return "Meisterclub";
+  }
+
+  if (ralfUserId && recipe.userId === ralfUserId) {
+    return "Wurstclub";
+  }
+
+  return "Wurstclub";
+}
+
+function resolveLockCta(args: {
+  canOpen: boolean;
+  role: MembershipRole;
+  recipe: Recipe;
+}): RecipeLockCta | null {
+  if (args.canOpen) {
+    return null;
+  }
+
+  if (args.role === "guest") {
+    return "login";
+  }
+
+  if (args.recipe.isCourseLinked && !args.recipe.isRecipeOfMonth) {
+    return "course";
+  }
+
+  return "membership";
+}
+
+function mapToPublicSummary(
+  recipe: Recipe,
+  args: {
+    canOpen: boolean;
+    ralfUserId: string | null;
+    role: MembershipRole;
+  },
+): PublicRecipeSummary {
   const payload = parseRecipePayload(recipe.payload) ?? getDefaultRecipePayload();
+  const accessLabel = resolveAccessLabel(recipe, args.ralfUserId);
 
   return {
     id: recipe.id,
@@ -130,6 +244,15 @@ function mapToPublicSummary(recipe: Recipe): PublicRecipeSummary {
     recipeType: deriveRecipeType(payload),
     meatLineCount: payload.meats.length,
     ingredientCount: payload.ingredients.length,
+    isRecipeOfMonth: recipe.isRecipeOfMonth,
+    hasImage: Boolean(recipe.imageStorageKey),
+    canOpen: args.canOpen,
+    accessLabel,
+    lockCta: resolveLockCta({
+      canOpen: args.canOpen,
+      role: args.role,
+      recipe,
+    }),
   };
 }
 
@@ -142,6 +265,34 @@ function matchesRecipeTypeFilter(
   }
 
   return recipeType === filter;
+}
+
+/**
+ * WHERE für den öffentlichen Teaser-Katalog (sichtbar für alle Stufen).
+ */
+function buildCatalogAccessOr(
+  ralfUserId: string | null,
+): Prisma.RecipeWhereInput[] {
+  const accessOr: Prisma.RecipeWhereInput[] = [
+    {
+      isRecipeOfMonth: true,
+      visibility: RecipeVisibility.database,
+    },
+    { isCourseLinked: true },
+    { visibility: RecipeVisibility.public },
+    { isMeisterclubSpecial: true },
+  ];
+
+  if (ralfUserId) {
+    accessOr.push({
+      userId: ralfUserId,
+      visibility: {
+        in: [RecipeVisibility.database, RecipeVisibility.public],
+      },
+    });
+  }
+
+  return accessOr;
 }
 
 async function isCourseLinkedRecipeUnlockedForUser(
@@ -175,7 +326,7 @@ async function isCourseLinkedRecipeUnlockedForUser(
   return false;
 }
 
-function canRecipeBeVisibleInDatabaseBase(args: {
+function canRecipeBeOpenedByRoleBase(args: {
   recipe: Recipe;
   role: MembershipAccessContext["role"];
   ralfUserId: string | null;
@@ -199,7 +350,6 @@ function canRecipeBeVisibleInDatabaseBase(args: {
 
   switch (role) {
     case "registered":
-      // Monatsrezept oben; Kursrezepte über canCourseLockedRecipeBeVisibleForUser.
       return false;
     case "wurstclub":
       return isRalfRecipe;
@@ -217,14 +367,30 @@ function canRecipeBeVisibleInDatabaseBase(args: {
   }
 }
 
-async function canCourseLockedRecipeBeVisibleForUser(args: {
+/**
+ * Prüft, ob der Nutzer das Rezept vollständig öffnen darf.
+ * Gäste sehen nur Teaser; Registrierte u. a. Rezept des Monats + gebuchte Kursrezepte.
+ */
+export async function canUserOpenOfficialRecipe(args: {
   recipe: Recipe;
   membership: MembershipAccessContext;
   ralfUserId: string | null;
 }): Promise<boolean> {
-  const { recipe, membership } = args;
+  const { recipe, membership, ralfUserId } = args;
 
   if (recipe.deletedAt !== null || recipe.status !== RecipeStatus.published) {
+    return false;
+  }
+
+  if (membership.role === "guest" || !membership.userId) {
+    return false;
+  }
+
+  const readCheck = checkMembershipCapability(
+    membership,
+    "recipe.database.read",
+  );
+  if (!readCheck.allowed) {
     return false;
   }
 
@@ -235,152 +401,50 @@ async function canCourseLockedRecipeBeVisibleForUser(args: {
 
   // Kursrezepte: freigeschaltet durch Kursbuchung — unabhängig von Club-Stufe.
   if (recipe.isCourseLinked) {
-    if (!membership.userId) {
-      return false;
-    }
-
     return isCourseLinkedRecipeUnlockedForUser({
       recipeId: recipe.id,
       userId: membership.userId,
     });
   }
 
-  return canRecipeBeVisibleInDatabaseBase({
+  return canRecipeBeOpenedByRoleBase({
     recipe,
     role: membership.role,
-    ralfUserId: args.ralfUserId,
+    ralfUserId,
   });
 }
 
-/**
- * Filtert kursgebundene Rezepte heraus, für die der Nutzer keinen Kurszugriff hat.
- * Monatsrezepte bleiben immer sichtbar.
- */
-async function filterCourseLockedRecipes(
-  recipes: Recipe[],
-  userId: string | null,
-): Promise<Recipe[]> {
-  const locked = recipes.filter((r) => r.isCourseLinked && !r.isRecipeOfMonth);
-
-  if (locked.length === 0) {
-    return recipes;
+function lockMessageForCta(
+  lockCta: RecipeLockCta | null,
+  accessLabel: RecipeCatalogAccessLabel,
+): string {
+  switch (lockCta) {
+    case "login":
+      return "Bitte melde dich an, um dieses Rezept zu öffnen.";
+    case "course":
+      return "Dieses Kursrezept wird freigeschaltet, sobald du den zugehörigen Kurs gebucht hast.";
+    case "membership":
+      return `Dieses Rezept ist für die Stufe „${accessLabel}“ freigeschaltet. Mit einer passenden Mitgliedschaft kannst du es öffnen.`;
+    default:
+      return "Du hast keinen Zugriff auf dieses Rezept.";
   }
-
-  if (!userId) {
-    return recipes.filter((r) => !r.isCourseLinked || r.isRecipeOfMonth);
-  }
-
-  const lockedIds = locked.map((r) => r.id);
-
-  const courseLessons = await prisma.courseLesson.findMany({
-    where: {
-      lessonType: "recipe",
-      recipeId: { in: lockedIds },
-    },
-    select: {
-      recipeId: true,
-      module: { select: { courseId: true } },
-    },
-  });
-
-  const courseIdsPerRecipe = new Map<string, Set<string>>();
-  for (const lesson of courseLessons) {
-    if (!lesson.recipeId) {
-      continue;
-    }
-    const set = courseIdsPerRecipe.get(lesson.recipeId) ?? new Set<string>();
-    set.add(lesson.module.courseId);
-    courseIdsPerRecipe.set(lesson.recipeId, set);
-  }
-
-  const uniqueCourseIds = new Set<string>();
-  for (const set of courseIdsPerRecipe.values()) {
-    for (const courseId of set) {
-      uniqueCourseIds.add(courseId);
-    }
-  }
-
-  const allowedCourseIds = new Map<string, boolean>();
-  for (const courseId of uniqueCourseIds) {
-    allowedCourseIds.set(courseId, await hasActiveCourseAccess(userId, courseId));
-  }
-
-  const unlockedRecipeIds = new Set<string>();
-  for (const [rid, courseIdSet] of courseIdsPerRecipe.entries()) {
-    const ok = Array.from(courseIdSet).some(
-      (cid) => allowedCourseIds.get(cid) === true,
-    );
-    if (ok) {
-      unlockedRecipeIds.add(rid);
-    }
-  }
-
-  return recipes.filter(
-    (r) =>
-      !r.isCourseLinked ||
-      r.isRecipeOfMonth ||
-      unlockedRecipeIds.has(r.id),
-  );
 }
 
 /**
- * Listet Rezepte für die öffentliche Rezeptdatenbank (nach Stufe + Kurs-Freigabe).
+ * Listet Rezepte als Teaser-Katalog. Sichtbar für alle; `canOpen` steuert das Öffnen.
  */
 export async function listOfficialRecipes(
   input: ListOfficialRecipesInput = {},
 ): Promise<RecipeServiceResult<PublicRecipeSummary[]>> {
-  if (input.membership) {
-    const readCheck = checkMembershipCapability(
-      input.membership,
-      "recipe.database.read",
-    );
-    const guard = guardMembershipCheck(readCheck);
-
-    if (guard) {
-      return guard;
-    }
-  }
-
-  const membership = input.membership;
-  const role = membership?.role ?? "guest";
-  const userId = membership?.userId ?? null;
+  const membership =
+    input.membership ?? createMembershipContext("guest", null);
+  const role = membership.role;
 
   try {
-    const ralfUserId =
-      role === "wurstclub" || role === "meisterclub" || role === "admin"
-        ? await resolveRalfUserId()
-        : null;
-
-    const accessOr: Prisma.RecipeWhereInput[] = [
-      // Basis: Rezept des Monats (alle registrierten Stufen).
-      {
-        isRecipeOfMonth: true,
-        visibility: RecipeVisibility.database,
-      },
+    const ralfUserId = await resolveRalfUserId();
+    const and: Prisma.RecipeWhereInput[] = [
+      { OR: buildCatalogAccessOr(ralfUserId) },
     ];
-
-    // Kursrezepte: Kandidaten laden, Freigabe später per Kurszugriff filtern.
-    if (userId) {
-      accessOr.push({ isCourseLinked: true });
-    }
-
-    // Wurstclub+: Club-Inhalte (Ralf-Rezepte / Wurstclub-Rezept des Monats).
-    if (ralfUserId) {
-      accessOr.push({
-        userId: ralfUserId,
-        visibility: {
-          in: [RecipeVisibility.database, RecipeVisibility.public],
-        },
-      });
-    }
-
-    // Meisterclub / Admin: öffentliche Nutzerrezepte + Meisterclub-Specials.
-    if (role === "meisterclub" || role === "admin") {
-      accessOr.push({ visibility: RecipeVisibility.public });
-      accessOr.push({ isMeisterclubSpecial: true });
-    }
-
-    const and: Prisma.RecipeWhereInput[] = [{ OR: accessOr }];
 
     if (input.category?.trim()) {
       and.push({
@@ -406,13 +470,27 @@ export async function listOfficialRecipes(
         ...RECIPE_DB_BASE_WHERE,
         AND: and,
       },
-      orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+      orderBy: [
+        { isRecipeOfMonth: "desc" },
+        { publishedAt: "desc" },
+        { updatedAt: "desc" },
+      ],
     });
 
-    const finalRecipes = await filterCourseLockedRecipes(recipes, userId);
+    const openFlags = await Promise.all(
+      recipes.map((recipe) =>
+        canUserOpenOfficialRecipe({ recipe, membership, ralfUserId }),
+      ),
+    );
 
-    const summaries = finalRecipes
-      .map(mapToPublicSummary)
+    const summaries = recipes
+      .map((recipe, index) =>
+        mapToPublicSummary(recipe, {
+          canOpen: openFlags[index] ?? false,
+          ralfUserId,
+          role,
+        }),
+      )
       .filter((summary) =>
         matchesRecipeTypeFilter(summary.recipeType, input.recipeType),
       );
@@ -424,24 +502,13 @@ export async function listOfficialRecipes(
 }
 
 /**
- * Lädt ein Rezept für die Detailseite (nach Stufe + Kurs-Freigabe).
+ * Lädt ein Rezept für die Detailseite.
+ * Ohne Berechtigung: Teaser ohne Payload (`canOpen: false`).
  */
 export async function getOfficialRecipeById(
   recipeId: string,
   membership?: MembershipAccessContext,
 ): Promise<RecipeServiceResult<PublicRecipeDetail>> {
-  if (membership) {
-    const readCheck = checkMembershipCapability(
-      membership,
-      "recipe.database.read",
-    );
-    const guard = guardMembershipCheck(readCheck);
-
-    if (guard) {
-      return guard;
-    }
-  }
-
   if (!isValidUuid(recipeId)) {
     return recipeFailure({
       code: "VALIDATION_ERROR",
@@ -449,38 +516,41 @@ export async function getOfficialRecipeById(
     });
   }
 
+  const access = membership ?? createMembershipContext("guest", null);
+
   try {
     const recipe = await prisma.recipe.findUnique({
       where: { id: recipeId },
     });
 
-    if (!recipe || !membership) {
+    const ralfUserId = await resolveRalfUserId();
+
+    if (!recipe || !isRecipeInPublicCatalog(recipe, ralfUserId)) {
       return recipeFailure({
         code: "NOT_FOUND",
         message: "Das Rezept ist nicht in der Rezeptdatenbank verfügbar.",
       });
     }
 
-    const role = membership.role;
-    const ralfUserId =
-      role === "wurstclub" || role === "meisterclub" || role === "admin"
-        ? await resolveRalfUserId()
-        : null;
-
-    const allowed = await canCourseLockedRecipeBeVisibleForUser({
+    const canOpen = await canUserOpenOfficialRecipe({
       recipe,
-      membership,
+      membership: access,
       ralfUserId,
     });
 
-    if (!allowed) {
-      return recipeFailure({
-        code: "NOT_FOUND",
-        message: "Das Rezept ist nicht in der Rezeptdatenbank verfügbar.",
+    const summary = mapToPublicSummary(recipe, {
+      canOpen,
+      ralfUserId,
+      role: access.role,
+    });
+
+    if (!canOpen) {
+      return recipeSuccess({
+        ...summary,
+        payload: null,
       });
     }
 
-    const summary = mapToPublicSummary(recipe);
     const payload =
       parseRecipePayload(recipe.payload) ?? getDefaultRecipePayload();
 
@@ -554,22 +624,25 @@ export async function copyOfficialRecipeToUser(
       });
     }
 
-    // Nur Rezepte, die in der Rezeptdatenbank sichtbar sind.
-    const allowed = await canCourseLockedRecipeBeVisibleForUser({
+    const ralfUserId = await resolveRalfUserId();
+
+    const allowed = await canUserOpenOfficialRecipe({
       recipe: source,
       membership,
-      ralfUserId:
-        membership.role === "wurstclub" ||
-        membership.role === "meisterclub" ||
-        membership.role === "admin"
-          ? await resolveRalfUserId()
-          : null,
+      ralfUserId,
     });
 
     if (!allowed) {
       return recipeFailure({
-        code: "NOT_FOUND",
-        message: "Das Rezept kann nicht kopiert werden.",
+        code: "FORBIDDEN",
+        message: lockMessageForCta(
+          resolveLockCta({
+            canOpen: false,
+            role: membership.role,
+            recipe: source,
+          }),
+          resolveAccessLabel(source, ralfUserId),
+        ),
       });
     }
 

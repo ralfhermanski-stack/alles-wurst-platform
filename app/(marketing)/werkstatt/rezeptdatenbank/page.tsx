@@ -19,7 +19,7 @@ export default function RezeptdatenbankPage() {
       <PageHeader
         eyebrow="Werkstatt"
         title="Rezeptdatenbank"
-        description="Rezept des Monats, Kursrezepte und Club-Inhalte — je nach Mitgliedschaft und gebuchten Kursen. Freigegebene Rezepte kannst du in deinen Rezeptgenerator kopieren."
+        description="Alle freigegebenen Rezepte als Vorschau — vollständig öffenbar je nach Mitgliedschaft und gebuchten Kursen. Freigegebene Rezepte kannst du in deinen Rezeptgenerator kopieren."
       />
 
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 space-y-8">

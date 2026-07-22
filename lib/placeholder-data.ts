@@ -491,7 +491,7 @@ export const adminActivity = [
   { time: "vor 3 Std", text: "Zertifikat AW-CERT-2026-00188 ausgestellt" },
 ];
 
-// ── Rezeptdatenbank (Wissensbibliothek) ──────────────────────────────────────
+// ── Rezeptdatenbank (Legacy-Typen für ältere Karten; Listen kommen aus der DB) ─
 
 export type RecipeAccess = "Gast" | "Wurst Club" | "Wurst Club Pro" | "Meisterklasse";
 
@@ -507,133 +507,6 @@ export type Recipe = {
   icon: string;
 };
 
-export const recipeOfMonth = {
-  title: "Fränkische Bratwurst – klassisch grob",
-  category: "Bratwurst",
-  difficulty: "Mittel" as const,
-  time: "ca. 90 Min",
-  excerpt:
-    "Grob gewolft, mild gewürzt mit Majoran und Muskat – die fränkische Bratwurst ist ein zeitloser Klassiker. Dieses Monatsrezept führt dich Schritt für Schritt zur perfekten Brätkonsistenz.",
-  accent: "from-aw-gold/25",
-  icon: "flame",
-};
-
-export const recipeCategories: { name: string; icon: string; count: number }[] = [
-  { name: "Brühwurst", icon: "sausage", count: 84 },
-  { name: "Rohwurst", icon: "meat", count: 63 },
-  { name: "Kochwurst", icon: "recipe", count: 41 },
-  { name: "Bratwurst", icon: "flame", count: 57 },
-  { name: "Schinken & Pökelware", icon: "brine", count: 38 },
-  { name: "Räucherwaren", icon: "smoke", count: 46 },
-  { name: "Marinaden & Rubs", icon: "marinade", count: 52 },
-  { name: "Grundrezepte", icon: "book", count: 29 },
-];
-
-export const sampleRecipes: Recipe[] = [
-  {
-    slug: "wiener-wuerstchen",
-    title: "Wiener Würstchen",
-    excerpt: "Fein gebrühte Klassiker mit zartem Biss – ideal für den Einstieg in die Brühwurst.",
-    category: "Brühwurst",
-    difficulty: "Einfach",
-    time: "120 Min",
-    access: "Wurst Club",
-    accent: "from-aw-brown/40",
-    icon: "sausage",
-  },
-  {
-    slug: "leberkaese",
-    title: "Bayerischer Leberkäse",
-    excerpt: "Feinbrät, sauber gebacken – die goldene Kruste ist das Geheimnis.",
-    category: "Kochwurst",
-    difficulty: "Mittel",
-    time: "150 Min",
-    access: "Wurst Club",
-    accent: "from-aw-gold/25",
-    icon: "recipe",
-  },
-  {
-    slug: "ungarische-salami",
-    title: "Ungarische Salami",
-    excerpt: "Edelschimmel, langsame Reifung und feine Paprikanote – hohe Rohwurstkunst.",
-    category: "Rohwurst",
-    difficulty: "Anspruchsvoll",
-    time: "6–8 Wochen",
-    access: "Wurst Club Pro",
-    accent: "from-aw-surface-2",
-    icon: "meat",
-  },
-  {
-    slug: "kabanossi",
-    title: "Kabanossi",
-    excerpt: "Würzig-geräucherte Schnittfeste zum Snacken – ein echter Dauerbrenner.",
-    category: "Rohwurst",
-    difficulty: "Mittel",
-    time: "3–4 Wochen",
-    access: "Wurst Club Pro",
-    accent: "from-aw-brown/40",
-    icon: "smoke",
-  },
-  {
-    slug: "schwarzwaelder-schinken",
-    title: "Schwarzwälder Schinken",
-    excerpt: "Gepökelt, kalt geräuchert, luftgereift – Geduld wird mit Aroma belohnt.",
-    category: "Schinken & Pökelware",
-    difficulty: "Anspruchsvoll",
-    time: "8–12 Wochen",
-    access: "Meisterklasse",
-    accent: "from-aw-surface-2",
-    icon: "brine",
-  },
-  {
-    slug: "chorizo",
-    title: "Chorizo",
-    excerpt: "Spanische Rohwurst mit Pimentón – kräftig, rauchig und unverkennbar rot.",
-    category: "Rohwurst",
-    difficulty: "Mittel",
-    time: "3–5 Wochen",
-    access: "Wurst Club Pro",
-    accent: "from-aw-gold/25",
-    icon: "flame",
-  },
-];
-
-export const lockedRecipes: Recipe[] = [
-  {
-    slug: "trueffel-mettwurst",
-    title: "Trüffel-Mettwurst (Meisterrezept)",
-    excerpt: "Exklusive Rezeptur mit Sommertrüffel – nur für die Meisterklasse.",
-    category: "Meisterrezept",
-    difficulty: "Anspruchsvoll",
-    time: "4 Wochen",
-    access: "Meisterklasse",
-    accent: "from-aw-gold/25",
-    icon: "crown",
-  },
-  {
-    slug: "fermentierte-chili-salami",
-    title: "Fermentierte Chili-Salami",
-    excerpt: "Kontrollierte Fermentation mit Starterkulturen und feuriger Schärfe.",
-    category: "Meisterrezept",
-    difficulty: "Anspruchsvoll",
-    time: "6 Wochen",
-    access: "Meisterklasse",
-    accent: "from-aw-brown/40",
-    icon: "meat",
-  },
-  {
-    slug: "wagyu-bratwurst",
-    title: "Wagyu-Bratwurst",
-    excerpt: "Premium-Brät aus marmoriertem Wagyu – dezent gewürzt, maximaler Genuss.",
-    category: "Bratwurst",
-    difficulty: "Mittel",
-    time: "90 Min",
-    access: "Wurst Club Pro",
-    accent: "from-aw-surface-2",
-    icon: "flame",
-  },
-];
-
 export type RecipeTier = {
   tier: string;
   tierKey: "gast" | "bronze" | "silver" | "gold";
@@ -645,30 +518,39 @@ export const recipeAccess: RecipeTier[] = [
   {
     tier: "Gast",
     tierKey: "gast",
-    note: "kostenlos",
-    items: ["Rezept des Monats"],
-  },
-  {
-    tier: "Wurst Club",
-    tierKey: "bronze",
-    note: "Bronze",
-    items: ["Rezept des Monats", "Archiv: Rezept des Monats"],
-  },
-  {
-    tier: "Wurst Club Pro",
-    tierKey: "silver",
-    note: "Silber",
-    items: ["Alle Club-Inhalte", "Erweiterte Rezeptbibliothek"],
-  },
-  {
-    tier: "Meisterklasse",
-    tierKey: "gold",
-    note: "Gold",
+    note: "Vorschau",
     items: [
-      "Vollständige Rezeptdatenbank",
-      "Eigene Rezepte anlegen",
-      "Exklusive Meisterrezepte",
-      "Rezeptanalyse",
+      "Sieht Name & Beschreibung aller Rezepte",
+      "Öffnen erst nach Anmeldung",
+    ],
+  },
+  {
+    tier: "Registriert",
+    tierKey: "bronze",
+    note: "Basis",
+    items: [
+      "Rezept des Monats öffnen",
+      "Kursrezepte bei gebuchtem Kurs",
+    ],
+  },
+  {
+    tier: "Wurstclub",
+    tierKey: "silver",
+    note: "Club",
+    items: [
+      "Rezept des Monats",
+      "Offizielle Club-Rezepte",
+      "Gebuchte Kursrezepte",
+    ],
+  },
+  {
+    tier: "Meisterclub",
+    tierKey: "gold",
+    note: "Vollzugriff",
+    items: [
+      "Alle Club- und Meisterrezepte",
+      "Öffentliche Nutzerrezepte",
+      "Kopieren in den Rezeptgenerator",
     ],
   },
 ];
