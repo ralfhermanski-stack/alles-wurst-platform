@@ -107,6 +107,18 @@ export async function moderateAdminRecipeApi(
   });
 }
 
+/** Rezept soft-löschen (Admin) */
+export async function deleteAdminRecipeApi(
+  id: string,
+): Promise<ApiResponse<{ id: string; deletedAt: string }>> {
+  return adminRequest<{ id: string; deletedAt: string }>(
+    `/api/admin/recipes/${id}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
 /** Kategorien laden (Admin) */
 export async function fetchAdminCategories(): Promise<
   ApiResponse<RecipeCategoryRecord[]>

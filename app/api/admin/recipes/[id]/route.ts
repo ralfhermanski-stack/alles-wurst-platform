@@ -8,6 +8,7 @@ import {
   parseJsonBody,
 } from "@/lib/admin/admin-api-utils";
 import {
+  deleteAdminRecipe,
   getAdminRecipeById,
   updateAdminRecipe,
 } from "@/lib/admin/admin-recipe-service";
@@ -95,6 +96,22 @@ export async function PATCH(request: Request, context: RouteContext) {
         : undefined,
     adminComment: getNullableStringField(body, "adminComment"),
   });
+
+  return jsonFromServiceResult(result);
+}
+
+/**
+ * DELETE /api/admin/recipes/[id] — Rezept soft-löschen (Admin).
+ */
+export async function DELETE(request: Request, context: RouteContext) {
+  const guard = await adminGuardResponse(request);
+
+  if (guard) {
+    return guard;
+  }
+
+  const { id } = await context.params;
+  const result = await deleteAdminRecipe(id);
 
   return jsonFromServiceResult(result);
 }

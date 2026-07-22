@@ -389,6 +389,55 @@ export async function getRecipeImageStorageKey(
 }
 
 /**
+ * Löscht ein Rezept als Admin (Soft-Delete via deletedAt, ohne Besitzerprüfung).
+ */
+export async function deleteAdminRecipe(
+  recipeId: string,
+): Promise<RecipeServiceResult<{ id: string; deletedAt: string }>> {
+  if (!isValidUuid(recipeId)) {
+    return recipeFailure({
+      code: "VALIDATION_ERROR",
+      message: "Die Rezept-ID muss eine gültige UUID sein.",
+    });
+  }
+
+  try {
+    const existing = await prisma.recipe.findUnique({
+      where: { id: recipeId },
+      select: { id: true, deletedAt: true },
+    });
+
+    if (!existing) {
+      return recipeFailure({
+        code: "NOT_FOUND",
+        message: "Das Rezept wurde nicht gefunden.",
+      });
+    }
+
+    if (existing.deletedAt) {
+      return recipeSuccess({
+        id: recipeId,
+        deletedAt: existing.deletedAt.toISOString(),
+      });
+    }
+
+    const deletedAt = new Date();
+
+    await prisma.recipe.update({
+      where: { id: recipeId },
+      data: { deletedAt, pdfStatus: RecipePdfStatus.outdated },
+    });
+
+    return recipeSuccess({
+      id: recipeId,
+      deletedAt: deletedAt.toISOString(),
+    });
+  } catch (error) {
+    return handlePrismaError(error);
+  }
+}
+
+/**
  * Führt eine Moderationsaktion auf einem Rezept aus.
  */
 export async function moderateAdminRecipe(

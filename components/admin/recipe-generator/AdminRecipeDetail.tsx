@@ -2,17 +2,21 @@
 
 /**
  * @file AdminRecipeDetail.tsx
- * @purpose Admin-Detailansicht mit Moderation und Kommentar.
+ * @purpose Admin-Detailansicht mit Kategorie, Moderation und Löschen.
  */
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
+  deleteAdminRecipeApi,
+  fetchAdminCategories,
   fetchAdminRecipe,
   moderateAdminRecipeApi,
   updateAdminRecipeApi,
 } from "@/lib/admin/admin-client";
+import type { RecipeCategoryRecord } from "@/lib/admin/admin-category-service";
 import {
   MODERATION_ACTION_LABELS,
   MODERATION_STATUS_LABELS,
@@ -31,7 +35,10 @@ type AdminRecipeDetailProps = {
 };
 
 export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) {
+  const router = useRouter();
   const [recipe, setRecipe] = useState<AdminRecipeRecord | null>(null);
+  const [categories, setCategories] = useState<RecipeCategoryRecord[]>([]);
+  const [category, setCategory] = useState("");
   const [adminComment, setAdminComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,18 +52,26 @@ export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) 
       setLoading(true);
       setError(null);
 
-      const response = await fetchAdminRecipe(recipeId);
+      const [recipeResponse, categoriesResponse] = await Promise.all([
+        fetchAdminRecipe(recipeId),
+        fetchAdminCategories(),
+      ]);
 
       if (cancelled) {
         return;
       }
 
-      if (!response.success) {
-        setError(response.error.message);
+      if (categoriesResponse.success) {
+        setCategories(categoriesResponse.data.filter((item) => item.active));
+      }
+
+      if (!recipeResponse.success) {
+        setError(recipeResponse.error.message);
         setRecipe(null);
       } else {
-        setRecipe(response.data);
-        setAdminComment(response.data.adminComment ?? "");
+        setRecipe(recipeResponse.data);
+        setCategory(recipeResponse.data.category ?? "");
+        setAdminComment(recipeResponse.data.adminComment ?? "");
       }
 
       setLoading(false);
@@ -89,6 +104,32 @@ export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) 
     setSuccess("Admin-Kommentar gespeichert.");
   }
 
+  async function saveCategory() {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    const next = category.trim() || null;
+    const response = await updateAdminRecipeApi(recipeId, {
+      category: next,
+    });
+
+    setSaving(false);
+
+    if (!response.success) {
+      setError(response.error.message);
+      return;
+    }
+
+    setRecipe(response.data);
+    setCategory(response.data.category ?? "");
+    setSuccess(
+      next
+        ? `Kategorie „${next}“ gespeichert.`
+        : "Kategorie entfernt.",
+    );
+  }
+
   async function runModeration(
     action: keyof typeof MODERATION_ACTION_LABELS,
   ) {
@@ -111,7 +152,37 @@ export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) 
 
     setRecipe(response.data);
     setAdminComment(response.data.adminComment ?? "");
+    setCategory(response.data.category ?? "");
     setSuccess(`Aktion ausgeführt: ${MODERATION_ACTION_LABELS[action]}`);
+  }
+
+  async function handleDelete() {
+    if (!recipe) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Rezept „${recipe.name}“ wirklich löschen? Es wird soft-gelöscht.`,
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    const response = await deleteAdminRecipeApi(recipeId);
+
+    setSaving(false);
+
+    if (!response.success) {
+      setError(response.error.message);
+      return;
+    }
+
+    router.push("/admin/werkstatt/rezeptgenerator");
   }
 
   if (loading) {
@@ -136,6 +207,10 @@ export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) 
     );
   }
 
+  const categoryOptions = categories.map((item) => item.name);
+  const hasOrphanCategory =
+    Boolean(category) && !categoryOptions.includes(category);
+
   return (
     <div className="p-6 sm:p-8">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -153,12 +228,22 @@ export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) 
             ID: <span className="font-mono">{recipe.id}</span>
           </p>
         </div>
-        <Link
-          href={`/admin/werkstatt/rezeptgenerator/${recipe.id}/bearbeiten`}
-          className="rounded-lg bg-aw-gold px-5 py-2.5 text-sm font-semibold text-aw-bg hover:bg-aw-cream"
-        >
-          Vollständig bearbeiten
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/admin/werkstatt/rezeptgenerator/${recipe.id}/bearbeiten`}
+            className="rounded-lg bg-aw-gold px-5 py-2.5 text-sm font-semibold text-aw-bg hover:bg-aw-cream"
+          >
+            Vollständig bearbeiten
+          </Link>
+          <button
+            type="button"
+            disabled={saving}
+            className="rounded-lg border border-red-500/40 bg-red-950/30 px-5 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-950/50 disabled:opacity-50"
+            onClick={() => void handleDelete()}
+          >
+            Löschen
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -184,10 +269,6 @@ export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) 
             <div className="flex justify-between gap-4">
               <dt className="text-aw-muted">User-ID</dt>
               <dd className="font-mono text-xs">{recipe.userId}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-aw-muted">Kategorie</dt>
-              <dd>{recipe.category ?? "—"}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-aw-muted">Status</dt>
@@ -221,6 +302,48 @@ export default function AdminRecipeDetail({ recipeId }: AdminRecipeDetailProps) 
           {recipe.description && (
             <p className="mt-4 text-sm text-aw-cream">{recipe.description}</p>
           )}
+
+          <div className="mt-6 border-t border-aw-border pt-5">
+            <h3 className="text-sm font-semibold text-aw-cream">
+              Kategorie zuweisen
+            </h3>
+            <p className="mt-1 text-xs text-aw-muted">
+              Auswahl aus dem Rezeptkategorie-Katalog (Einstellungen).
+            </p>
+            <label
+              htmlFor="admin-recipe-category"
+              className="mt-3 block text-sm font-semibold text-aw-cream"
+            >
+              Kategorie
+            </label>
+            <select
+              id="admin-recipe-category"
+              className={`${inputClassName} mt-2`}
+              value={category}
+              disabled={saving}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="">— keine —</option>
+              {hasOrphanCategory && (
+                <option value={category}>
+                  {category} (nicht im Katalog)
+                </option>
+              )}
+              {categoryOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={saving || (recipe.category ?? "") === category}
+              className="mt-3 rounded-lg border border-aw-border px-4 py-2 text-sm font-semibold text-aw-cream hover:border-aw-gold/50 disabled:opacity-50"
+              onClick={() => void saveCategory()}
+            >
+              Kategorie speichern
+            </button>
+          </div>
         </section>
 
         <section className="rounded-xl border border-aw-border bg-aw-surface/60 p-5">
