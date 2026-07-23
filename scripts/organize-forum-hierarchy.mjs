@@ -169,6 +169,7 @@ async function main() {
   const tree = await prisma.forum.findMany({
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
+      id: true,
       title: true,
       slug: true,
       parentForumId: true,
@@ -190,8 +191,7 @@ async function main() {
   }
 
   const orphans = tree.filter(
-    (forum) =>
-      forum.parentForumId && !byId.has(forum.parentForumId),
+    (forum) => forum.parentForumId && !byId.has(forum.parentForumId),
   );
   if (orphans.length > 0) {
     console.warn("\nWARN verwaiste parentForumId:", orphans.map((o) => o.slug));
