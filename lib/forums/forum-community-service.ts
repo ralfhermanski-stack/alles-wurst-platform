@@ -355,7 +355,8 @@ export async function getVisibleForumsForUser(
 
   function walk(nodes: CommunityForumEntry[]) {
     for (const node of nodes) {
-      if (node.canOpen) {
+      // Nur Blatt-Foren: Oberforen sind Kategorie-Header, keine Ziel-Foren
+      if (node.canOpen && node.children.length === 0) {
         openable.push({ ...node, children: [] });
       }
 

@@ -43,38 +43,131 @@ function UnreadBadge({ count }: { count: number }) {
   );
 }
 
-function ForumRow({
-  forum,
-  depth = 0,
+function StatusIcon({
+  canOpen,
+  hasUnread,
 }: {
-  forum: CommunityForumEntry;
-  depth?: number;
+  canOpen: boolean;
+  hasUnread: boolean;
 }) {
+  if (!canOpen) {
+    return (
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-aw-border/70 bg-aw-bg/40 text-sm text-aw-muted"
+        aria-hidden
+      >
+        🔒
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border text-sm ${
+        hasUnread
+          ? "border-aw-gold/50 bg-aw-gold/15 text-aw-gold"
+          : "border-aw-border/70 bg-aw-bg/40 text-aw-muted"
+      }`}
+      aria-hidden
+    >
+      {hasUnread ? "●" : "○"}
+    </span>
+  );
+}
+
+function ColumnHeaders() {
+  return (
+    <div className="hidden grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_minmax(7rem,11rem)] gap-3 border-b border-aw-border/80 bg-aw-bg/30 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-aw-muted sm:grid">
+      <span>Forum</span>
+      <span className="text-center">Themen</span>
+      <span className="text-center">Beiträge</span>
+      <span className="text-right">Letzter Beitrag</span>
+    </div>
+  );
+}
+
+function SubforumRow({ forum }: { forum: CommunityForumEntry }) {
   const hasUnread = forum.unreadCount > 0;
-  const paddingClass = depth > 0 ? "pl-7 sm:pl-10" : "";
+  const description =
+    forum.description?.trim() ||
+    [forum.readRuleLabel, forum.courseTitle].filter(Boolean).join(" · ");
+
+  const statsClass = hasUnread
+    ? "font-semibold text-aw-gold"
+    : "text-aw-muted";
+
+  const body = (
+    <>
+      <StatusIcon canOpen={forum.canOpen} hasUnread={hasUnread} />
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3
+            className={`truncate text-sm ${
+              hasUnread
+                ? "font-bold text-aw-cream"
+                : forum.canOpen
+                  ? "font-semibold text-aw-cream"
+                  : "font-medium text-aw-muted"
+            }`}
+          >
+            {forum.title}
+          </h3>
+          <AccessBadge label={forum.accessBadge} />
+          <UnreadBadge count={forum.unreadCount} />
+          {!forum.canOpen && (
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-aw-muted">
+              Gesperrt
+            </span>
+          )}
+        </div>
+        {description ? (
+          <p className="mt-0.5 line-clamp-2 text-[11px] text-aw-muted">
+            {description}
+          </p>
+        ) : null}
+        <p className="mt-1 text-[11px] text-aw-muted sm:hidden">
+          {forum.threadCount} Themen · {forum.postCount} Beiträge
+          {forum.lastActivityAt
+            ? ` · ${formatDateTime(forum.lastActivityAt)}`
+            : ""}
+        </p>
+      </div>
+      <p className={`hidden text-center text-xs tabular-nums sm:block ${statsClass}`}>
+        {forum.threadCount}
+      </p>
+      <p className={`hidden text-center text-xs tabular-nums sm:block ${statsClass}`}>
+        {forum.postCount}
+      </p>
+      <div className="hidden min-w-0 text-right sm:block">
+        {forum.lastActivityAt ? (
+          <>
+            <p className="truncate text-[11px] text-aw-cream/85">
+              {forum.lastActivitySummary ?? "Aktivität"}
+            </p>
+            <p className="text-[10px] text-aw-muted">
+              {formatDateTime(forum.lastActivityAt)}
+            </p>
+          </>
+        ) : (
+          <p className="text-[11px] text-aw-muted">—</p>
+        )}
+      </div>
+    </>
+  );
+
+  const rowClass = `grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 px-3 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)_4.5rem_4.5rem_minmax(7rem,11rem)] sm:items-center ${
+    hasUnread
+      ? "border-l-2 border-aw-gold bg-aw-gold/10"
+      : "border-l-2 border-transparent"
+  }`;
 
   if (!forum.canOpen) {
     return (
       <div
-        className={`grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 border-l-2 border-aw-border/60 px-3 py-2.5 opacity-75 ${paddingClass}`}
+        className={`${rowClass} opacity-80`}
         title={`${forum.readRuleLabel} — noch kein Zugang`}
       >
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-medium text-aw-muted">
-              {forum.title}
-            </h3>
-            <AccessBadge label={forum.accessBadge} />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-aw-muted">
-              Gesperrt
-            </span>
-          </div>
-          <p className="mt-0.5 truncate text-[11px] text-aw-muted">
-            {forum.readRuleLabel}
-            {forum.courseTitle ? ` · ${forum.courseTitle}` : ""}
-          </p>
-        </div>
-        <p className="text-right text-xs text-aw-muted">🔒</p>
+        {body}
       </div>
     );
   }
@@ -82,98 +175,79 @@ function ForumRow({
   return (
     <Link
       href={`/mein-bereich/foren/${forum.slug}`}
-      className={`grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2.5 transition-colors sm:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] ${paddingClass} ${
-        hasUnread
-          ? "border-l-2 border-aw-gold bg-aw-gold/10 hover:bg-aw-gold/15"
-          : "border-l-2 border-transparent hover:bg-aw-surface-2"
+      className={`${rowClass} transition-colors hover:bg-aw-surface-2 ${
+        hasUnread ? "hover:bg-aw-gold/15" : ""
       }`}
     >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3
-            className={`truncate text-sm ${
-              hasUnread
-                ? "font-bold text-aw-cream"
-                : "font-semibold text-aw-cream"
-            }`}
-          >
-            {forum.title}
-          </h3>
-          <AccessBadge label={forum.accessBadge} />
-          <UnreadBadge count={forum.unreadCount} />
-        </div>
-        <p className="mt-0.5 truncate text-[11px] text-aw-muted">
-          {forum.readRuleLabel}
-          {forum.courseTitle ? ` · ${forum.courseTitle}` : ""}
-          {forum.lastActivitySummary ? ` · ${forum.lastActivitySummary}` : ""}
-        </p>
-      </div>
-      <p
-        className={`text-right text-xs tabular-nums sm:text-center ${
-          hasUnread ? "font-semibold text-aw-gold" : "text-aw-muted"
-        }`}
-      >
-        {forum.threadCount} Themen
-      </p>
-      <p className="col-span-2 text-right text-[11px] text-aw-muted sm:col-span-1">
-        {forum.lastActivityAt ? formatDateTime(forum.lastActivityAt) : "—"}
-      </p>
+      {body}
     </Link>
   );
 }
 
-function ForumGroup({ forum }: { forum: CommunityForumEntry }) {
+function CategorySection({ forum }: { forum: CommunityForumEntry }) {
   const hasChildren = forum.children.length > 0;
-  const defaultOpen = forum.unreadCount > 0 || !hasChildren;
-  const [expanded, setExpanded] = useState(defaultOpen);
+  const [expanded, setExpanded] = useState(true);
+  const sectionUnread = hasChildren
+    ? forum.children.reduce((sum, child) => sum + child.unreadCount, 0)
+    : forum.unreadCount;
 
   if (!hasChildren) {
-    return <ForumRow forum={forum} />;
+    return (
+      <section className="overflow-hidden rounded-lg border border-aw-border bg-aw-surface/40">
+        <ColumnHeaders />
+        <SubforumRow forum={forum} />
+      </section>
+    );
   }
 
   return (
-    <div>
-      <div className="flex items-stretch">
+    <section className="overflow-hidden rounded-lg border border-aw-border bg-aw-surface/40">
+      <div
+        className={`flex items-center gap-2 border-b border-aw-border px-3 py-2 ${
+          sectionUnread > 0 ? "bg-aw-gold/10" : "bg-aw-bg/45"
+        }`}
+      >
         <button
           type="button"
           aria-expanded={expanded}
-          aria-label={expanded ? "Unterforen einklappen" : "Unterforen ausklappen"}
-          className="shrink-0 border-b border-aw-border px-2 text-aw-gold hover:bg-aw-surface-2"
+          aria-label={
+            expanded ? "Unterforen einklappen" : "Unterforen ausklappen"
+          }
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-aw-gold hover:bg-aw-surface-2"
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? "▾" : "▸"}
         </button>
-        <div className="min-w-0 flex-1 border-b border-aw-border">
-          <ForumRow
-            forum={{
-              ...forum,
-              // Oberforum-Zähler ohne Doppelzählung der Kinder in der Zeile
-              unreadCount: Math.max(
-                0,
-                forum.unreadCount -
-                  forum.children.reduce((sum, c) => sum + c.unreadCount, 0),
-              ),
-              threadCount: Math.max(
-                0,
-                forum.threadCount -
-                  forum.children.reduce((sum, c) => sum + c.threadCount, 0),
-              ),
-            }}
-          />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wide text-aw-cream sm:text-base">
+              {forum.title}
+            </h2>
+            <UnreadBadge count={sectionUnread} />
+          </div>
+          {forum.description?.trim() ? (
+            <p className="mt-0.5 truncate text-[11px] text-aw-muted">
+              {forum.description.trim()}
+            </p>
+          ) : null}
         </div>
+        <p className="hidden text-[10px] uppercase tracking-wide text-aw-muted sm:block">
+          {forum.children.length}{" "}
+          {forum.children.length === 1 ? "Unterforum" : "Unterforen"}
+        </p>
       </div>
 
-      {expanded && (
-        <div className="border-b border-aw-border bg-aw-bg/20">
-          <p className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wide text-aw-muted">
-            Unterforen
-          </p>
-          {forum.children.map((child) => (
-            <ForumRow key={child.id} forum={child} depth={1} />
-          ))}
-        </div>
-      )}
-    </div>
+      {expanded ? (
+        <>
+          <ColumnHeaders />
+          <div className="divide-y divide-aw-border/70">
+            {forum.children.map((child) => (
+              <SubforumRow key={child.id} forum={child} />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </section>
   );
 }
 
@@ -211,16 +285,14 @@ export default function CommunityOverview({
               </p>
             </div>
           ) : (
-            <div className="mt-3 overflow-hidden rounded-lg border border-aw-border bg-aw-surface/40">
-              <div className="divide-y divide-aw-border">
-                {forums.map((forum) => (
-                  <ForumGroup key={forum.id} forum={forum} />
-                ))}
-              </div>
-              <p className="border-t border-aw-border px-3 py-2 text-[11px] text-aw-muted">
+            <div className="mt-3 space-y-4">
+              {forums.map((forum) => (
+                <CategorySection key={forum.id} forum={forum} />
+              ))}
+              <p className="px-1 text-[11px] text-aw-muted">
                 Badges zeigen deinen Zugang: Registriert, Kurs, Wurstclub oder
-                Meisterclub. Gesperrte Clubforen erscheinen mit Schloss — Kursforen
-                erst nach Buchung.
+                Meisterclub. Gesperrte Clubforen erscheinen mit Schloss —
+                Kursforen erst nach Buchung.
               </p>
             </div>
           )}
