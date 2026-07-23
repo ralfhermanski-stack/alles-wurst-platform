@@ -81,6 +81,18 @@ async function canReadForumMirror(user, forum) {
     return false;
   }
 
+  const enrollmentGated =
+    forum.forumType === "course" ||
+    (forum.forumType === "mini_course_global" && Boolean(forum.courseId));
+
+  if (
+    isActiveMembership(user.membership) &&
+    user.membership.role === "meisterclub" &&
+    !enrollmentGated
+  ) {
+    return true;
+  }
+
   if (forum.forumType === "course" && forum.courseId) {
     return hasCourseAccess(user.id, forum.courseId);
   }
@@ -246,6 +258,54 @@ async function main() {
     "User mit Mitgliedschaft sieht Clubforum",
   );
 
+  const meisterOnlyForum = await prisma.forum.create({
+    data: {
+      title: `Meisterclub Test ${stamp}`,
+      slug: `meisterclub-test-${stamp}`,
+      forumType: "membership",
+      forumPurpose: "custom",
+      readAccess: "membership",
+      requiredMembershipRole: "meisterclub",
+      isActive: true,
+    },
+  });
+
+  assert(
+    !(await canReadForumMirror(user, meisterOnlyForum)),
+    "Wurstclub sieht Meisterclub-Forum nicht offen",
+  );
+
+  await prisma.membership.update({
+    where: { userId: user.id },
+    data: {
+      role: "meisterclub",
+      status: "active",
+      accessBlocked: false,
+      startedAt: new Date(),
+      paymentStatus: "paid",
+    },
+  });
+
+  user = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { membership: true },
+  });
+
+  assert(
+    await canReadForumMirror(user, meisterOnlyForum),
+    "Meisterclub öffnet Meisterclub-Forum",
+  );
+
+  assert(
+    await canReadForumMirror(user, clubForum),
+    "Meisterclub öffnet auch Wurstclub-Forum",
+  );
+
+  assert(
+    !(await canReadForumMirror(user, forum)),
+    "Meisterclub ohne Kursbuchung sieht Kursforum nicht",
+  );
+
   await prisma.membership.update({
     where: { userId: user.id },
     data: { status: "cancelled", endsAt: new Date() },
@@ -293,6 +353,7 @@ async function main() {
   assert(!thread.displayNameSnapshot.includes("Geheim"), "Kein Klarname öffentlich");
 
   await prisma.forumThread.delete({ where: { id: thread.id } }).catch(() => {});
+  await prisma.forum.delete({ where: { id: meisterOnlyForum.id } }).catch(() => {});
   await prisma.forum.delete({ where: { id: clubForum.id } });
   if (forum.slug.includes("-testforum-")) {
     await prisma.forum.delete({ where: { id: forum.id } }).catch(() => {});

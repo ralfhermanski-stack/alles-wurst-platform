@@ -24,12 +24,14 @@ export type ForumEntry = {
   requiredMembershipRole: MembershipRole | null;
   courseId: string | null;
   courseTitle: string | null;
+  parentForumId: string | null;
   isActive: boolean;
   sortOrder: number;
   threadCount: number;
   postCount: number;
   readRuleLabel: string;
   writeRuleLabel: string;
+  accessBadge: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -97,6 +99,7 @@ export type CreateForumInput = {
   writeEnabled?: boolean;
   requiredMembershipRole?: MembershipRole | null;
   courseId?: string | null;
+  parentForumId?: string | null;
   isActive?: boolean;
   sortOrder?: number;
 };
@@ -118,6 +121,9 @@ export type CreateForumPostInput = {
 export type CommunityForumEntry = ForumEntry & {
   lastActivityAt: string | null;
   lastActivitySummary: string | null;
+  unreadCount: number;
+  canOpen: boolean;
+  children: CommunityForumEntry[];
 };
 
 export type CommunityActivityEntry = {

@@ -170,6 +170,19 @@ function resolveReadAccess(forum: Forum): ForumReadAccess {
   }
 }
 
+/** Kurs-/Minikurs-Foren mit Buchungsbindung — nicht pauschal für Meisterclub offen */
+export function isEnrollmentGatedForum(forum: Pick<Forum, "forumType" | "courseId">): boolean {
+  if (forum.forumType === "course") {
+    return true;
+  }
+
+  return forum.forumType === "mini_course_global" && Boolean(forum.courseId);
+}
+
+function isActiveMeisterclub(context: ForumPermissionContext): boolean {
+  return isActiveMembership(context) && context.membershipRole === "meisterclub";
+}
+
 async function evaluateReadAccess(
   context: ForumPermissionContext,
   forum: Forum,
@@ -249,7 +262,7 @@ export async function canReadForumById(
 }
 
 /**
- * Darf der Nutzer das Forum lesen (und in Listen sehen)?
+ * Darf der Nutzer das Forum lesen (und öffnen)?
  */
 export async function canReadForum(
   userId: string | null,
@@ -274,6 +287,19 @@ export async function canReadForum(
     return false;
   }
 
+  // Meisterclub: alle Foren außer ungebuchten Kurs-/Minikurs-Foren
+  if (isActiveMeisterclub(ctx) && !isEnrollmentGatedForum(forum)) {
+    if (ctx.userId) {
+      const hasForumPermission = await hasPermission(ctx.userId, "forum.open");
+
+      if (!hasForumPermission && resolveReadAccess(forum) !== "public") {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   const canRead = await evaluateReadAccess(ctx, forum);
 
   if (!canRead) {
@@ -289,6 +315,42 @@ export async function canReadForum(
   }
 
   return true;
+}
+
+/**
+ * Sichtbarkeit in der Übersicht:
+ * - Kursforen ohne Buchung: ausblenden
+ * - Clubforen ohne Zugang: als gesperrter Teaser mit Badge
+ */
+export async function getForumOverviewVisibility(
+  userId: string | null,
+  forum: Forum,
+  context?: ForumPermissionContext,
+): Promise<{ visible: boolean; canOpen: boolean }> {
+  const ctx = context ?? (await loadForumPermissionContext(userId));
+  const canOpen = await canReadForum(userId, forum, ctx);
+
+  if (canOpen) {
+    return { visible: true, canOpen: true };
+  }
+
+  if (!forum.isActive) {
+    return { visible: false, canOpen: false };
+  }
+
+  if (isEnrollmentGatedForum(forum)) {
+    return { visible: false, canOpen: false };
+  }
+
+  if (
+    forum.forumType === "membership" &&
+    isAccountWritable(ctx) &&
+    ctx.userId
+  ) {
+    return { visible: true, canOpen: false };
+  }
+
+  return { visible: false, canOpen: false };
 }
 
 /**

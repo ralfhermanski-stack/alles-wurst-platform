@@ -19,6 +19,7 @@ export type ForumFormValues = {
   description: string;
   permissionKind: ForumPermissionKind;
   courseId: string;
+  parentForumId: string;
   writeEnabled: boolean;
   isActive: boolean;
   sortOrder: number;
@@ -29,6 +30,7 @@ export const EMPTY_FORUM_FORM: ForumFormValues = {
   description: "",
   permissionKind: "general_registered",
   courseId: "",
+  parentForumId: "",
   writeEnabled: true,
   isActive: true,
   sortOrder: 100,
@@ -37,6 +39,7 @@ export const EMPTY_FORUM_FORM: ForumFormValues = {
 type AdminForumFormProps = {
   values: ForumFormValues;
   courses: AdminForumCourseOption[];
+  parentOptions: Array<{ id: string; title: string }>;
   submitLabel: string;
   cancelLabel?: string;
   onChange: (values: ForumFormValues) => void;
@@ -47,6 +50,7 @@ type AdminForumFormProps = {
 export default function AdminForumForm({
   values,
   courses,
+  parentOptions,
   submitLabel,
   cancelLabel = "Abbrechen",
   onChange,
@@ -142,6 +146,25 @@ export default function AdminForumForm({
           </select>
         </div>
       )}
+
+      <div>
+        <label className="mb-1 block text-sm text-aw-muted">Oberforum</label>
+        <select
+          className={inputClassName}
+          value={values.parentForumId}
+          onChange={(e) => updateField("parentForumId", e.target.value)}
+        >
+          <option value="">Kein Oberforum (Top-Ebene)</option>
+          {parentOptions.map((forum) => (
+            <option key={forum.id} value={forum.id}>
+              {forum.title}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-aw-muted">
+          Optional: Forum als Unterforum unter einem Oberforum einordnen.
+        </p>
+      </div>
 
       <div className="flex flex-wrap gap-6">
         <label className="flex items-center gap-2 text-sm text-aw-cream">

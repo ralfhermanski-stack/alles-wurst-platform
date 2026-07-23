@@ -24,6 +24,57 @@ export const FORUM_READ_ACCESS_LABELS: Record<ForumReadAccess, string> = {
   mini_course_access: "Minikurs-Zugriff",
 };
 
+/** Kurze Zugangs-Badges für die Forum-Übersicht */
+export type ForumAccessBadge =
+  | "Öffentlich"
+  | "Registriert"
+  | "Kurs"
+  | "Minikurs"
+  | "Wurstclub"
+  | "Meisterclub";
+
+export function getForumAccessBadge(input: {
+  forumType: ForumType;
+  readAccess: ForumReadAccess;
+  requiredMembershipRole: MembershipRole | null;
+}): ForumAccessBadge {
+  if (input.forumType === "course") {
+    return "Kurs";
+  }
+
+  if (input.forumType === "mini_course_global") {
+    return "Minikurs";
+  }
+
+  if (input.forumType === "membership") {
+    if (input.requiredMembershipRole === "meisterclub") {
+      return "Meisterclub";
+    }
+
+    if (input.requiredMembershipRole === "wurstclub") {
+      return "Wurstclub";
+    }
+
+    return "Registriert";
+  }
+
+  if (input.readAccess === "public") {
+    return "Öffentlich";
+  }
+
+  if (input.readAccess === "membership") {
+    if (input.requiredMembershipRole === "meisterclub") {
+      return "Meisterclub";
+    }
+
+    if (input.requiredMembershipRole === "wurstclub") {
+      return "Wurstclub";
+    }
+  }
+
+  return "Registriert";
+}
+
 export function describeForumReadRule(input: {
   forumType: ForumType;
   readAccess: ForumReadAccess;

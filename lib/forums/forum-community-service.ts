@@ -1,6 +1,6 @@
 /**
  * @file forum-community-service.ts
- * @purpose Community-Übersicht: sichtbare Foren und echte Aktivitäten.
+ * @purpose Community-Übersicht: sichtbare Foren (Hierarchie) und Aktivitäten.
  */
 
 import type { Forum, ForumReadAccess, ForumType } from "@prisma/client";
@@ -11,19 +11,24 @@ import { isAdminSystemRole } from "@/lib/users/system-role";
 
 import {
   canReadForum,
+  getForumOverviewVisibility,
   loadForumPermissionContext,
   type ForumPermissionContext,
 } from "./forum-permissions";
 import {
   describeForumReadRule,
   describeForumWriteRule,
+  getForumAccessBadge,
 } from "./forum-labels";
+import { countUnreadThreadsByForumIds } from "./forum-watch-service";
 import type {
   CommunityActivityEntry,
   CommunityForumEntry,
   CommunityOverview,
   ForumEntry,
 } from "./forum-types";
+
+type ForumWithCourse = Forum & { course?: { title: string } | null };
 
 function defaultReadAccessForType(forumType: ForumType): ForumReadAccess {
   switch (forumType) {
@@ -75,8 +80,13 @@ async function getForumCounts(forumId: string): Promise<{
 }
 
 async function toCommunityForumEntry(
-  forum: Forum & { course?: { title: string } | null },
-  lastActivity: { at: Date; summary: string } | null,
+  forum: ForumWithCourse,
+  options: {
+    lastActivity: { at: Date; summary: string } | null;
+    unreadCount: number;
+    canOpen: boolean;
+    children?: CommunityForumEntry[];
+  },
 ): Promise<CommunityForumEntry> {
   const counts = await getForumCounts(forum.id);
   const readAccess =
@@ -94,6 +104,7 @@ async function toCommunityForumEntry(
     requiredMembershipRole: forum.requiredMembershipRole ?? null,
     courseId: forum.courseId,
     courseTitle: forum.course?.title ?? null,
+    parentForumId: forum.parentForumId ?? null,
     isActive: forum.isActive,
     sortOrder: forum.sortOrder,
     threadCount: counts.threadCount,
@@ -105,20 +116,28 @@ async function toCommunityForumEntry(
       courseTitle: forum.course?.title ?? null,
     }),
     writeRuleLabel: describeForumWriteRule(forum.writeEnabled ?? true),
+    accessBadge: getForumAccessBadge({
+      forumType: forum.forumType,
+      readAccess,
+      requiredMembershipRole: forum.requiredMembershipRole,
+    }),
     createdAt: forum.createdAt.toISOString(),
     updatedAt: forum.updatedAt.toISOString(),
   };
 
   return {
     ...base,
-    lastActivityAt: lastActivity?.at.toISOString() ?? null,
-    lastActivitySummary: lastActivity?.summary ?? null,
+    lastActivityAt: options.lastActivity?.at.toISOString() ?? null,
+    lastActivitySummary: options.lastActivity?.summary ?? null,
+    unreadCount: options.unreadCount,
+    canOpen: options.canOpen,
+    children: options.children ?? [],
   };
 }
 
-async function loadVisibleForums(
+async function loadCandidateForums(
   userId: string | null,
-): Promise<Array<Forum & { course?: { title: string } | null }>> {
+): Promise<ForumWithCourse[]> {
   const context = await loadForumPermissionContext(userId);
   const staff = isStaffContext(context);
 
@@ -128,10 +147,16 @@ async function loadVisibleForums(
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
 
-  const visible: Array<Forum & { course?: { title: string } | null }> = [];
+  const visible: ForumWithCourse[] = [];
 
   for (const forum of forums) {
-    if (await canReadForum(userId, forum, context)) {
+    const { visible: show } = await getForumOverviewVisibility(
+      userId,
+      forum,
+      context,
+    );
+
+    if (show) {
       visible.push(forum);
     }
   }
@@ -267,39 +292,115 @@ async function loadCommunityActivity(
   return entries.slice(0, limit);
 }
 
+function buildForumTree(
+  entries: CommunityForumEntry[],
+): CommunityForumEntry[] {
+  const byId = new Map(
+    entries.map((entry) => [entry.id, { ...entry, children: [] as CommunityForumEntry[] }]),
+  );
+  const roots: CommunityForumEntry[] = [];
+
+  for (const entry of byId.values()) {
+    const parentId = entry.parentForumId;
+
+    if (parentId && byId.has(parentId)) {
+      byId.get(parentId)!.children.push(entry);
+    } else {
+      roots.push(entry);
+    }
+  }
+
+  for (const root of roots) {
+    const childUnread = root.children.reduce(
+      (sum, child) => sum + child.unreadCount,
+      0,
+    );
+    root.unreadCount = root.unreadCount + childUnread;
+    root.threadCount =
+      root.threadCount +
+      root.children.reduce((sum, child) => sum + child.threadCount, 0);
+    root.postCount =
+      root.postCount +
+      root.children.reduce((sum, child) => sum + child.postCount, 0);
+
+    const childActivity = root.children
+      .filter((child) => child.lastActivityAt)
+      .sort(
+        (a, b) =>
+          new Date(b.lastActivityAt!).getTime() -
+          new Date(a.lastActivityAt!).getTime(),
+      )[0];
+
+    if (
+      childActivity?.lastActivityAt &&
+      (!root.lastActivityAt ||
+        new Date(childActivity.lastActivityAt) > new Date(root.lastActivityAt))
+    ) {
+      root.lastActivityAt = childActivity.lastActivityAt;
+      root.lastActivitySummary = childActivity.lastActivitySummary;
+    }
+  }
+
+  return roots;
+}
+
 /**
- * Alle Foren, die der Nutzer auf der Community-Seite sehen darf.
+ * Alle Foren, die der Nutzer öffnen darf (flach, inkl. Unterforen).
  */
 export async function getVisibleForumsForUser(
   userId: string | null,
 ): Promise<CommunityForumEntry[]> {
   const overview = await getCommunityOverview(userId);
+  const openable: CommunityForumEntry[] = [];
 
-  return overview.forums;
+  function walk(nodes: CommunityForumEntry[]) {
+    for (const node of nodes) {
+      if (node.canOpen) {
+        openable.push({ ...node, children: [] });
+      }
+
+      walk(node.children);
+    }
+  }
+
+  walk(overview.forums);
+
+  return openable;
 }
 
 /**
- * Community-Übersicht mit Foren und Aktivitätsfeed (serverseitig gefiltert).
+ * Community-Übersicht mit Hierarchie, Badges und Ungelesen-Zählern.
  */
 export async function getCommunityOverview(
   userId: string | null,
 ): Promise<CommunityOverview> {
-  const visibleForums = await loadVisibleForums(userId);
-  const forumIds = visibleForums.map((forum) => forum.id);
-  const lastActivity = await loadLastActivityByForum(forumIds);
+  const context = await loadForumPermissionContext(userId);
+  const candidates = await loadCandidateForums(userId);
+  const forumIds = candidates.map((forum) => forum.id);
+  const [lastActivity, unreadByForum] = await Promise.all([
+    loadLastActivityByForum(forumIds),
+    userId
+      ? countUnreadThreadsByForumIds(userId, forumIds)
+      : Promise.resolve(new Map<string, number>()),
+  ]);
 
-  const forums: CommunityForumEntry[] = [];
+  const flatEntries: CommunityForumEntry[] = [];
 
-  for (const forum of visibleForums) {
-    forums.push(
-      await toCommunityForumEntry(
-        forum,
-        lastActivity.get(forum.id) ?? null,
-      ),
+  for (const forum of candidates) {
+    const canOpen = await canReadForum(userId, forum, context);
+
+    flatEntries.push(
+      await toCommunityForumEntry(forum, {
+        lastActivity: lastActivity.get(forum.id) ?? null,
+        unreadCount: unreadByForum.get(forum.id) ?? 0,
+        canOpen,
+      }),
     );
   }
 
-  const activity = await loadCommunityActivity(forumIds);
+  const forums = buildForumTree(flatEntries);
+  const openableIds = flatEntries.filter((f) => f.canOpen).map((f) => f.id);
+  const activity = await loadCommunityActivity(openableIds);
 
   return { forums, activity };
 }

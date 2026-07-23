@@ -49,6 +49,46 @@ export async function countUnreadForumThreads(userId: string): Promise<number> {
 }
 
 /**
+ * Anzahl ungelesener Threads je Forum (für Hub-Badges).
+ */
+export async function countUnreadThreadsByForumIds(
+  userId: string,
+  forumIds: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+
+  if (forumIds.length === 0) {
+    return result;
+  }
+
+  const rows = await prisma.forumThreadWatch.groupBy({
+    by: ["threadId"],
+    where: {
+      userId,
+      unreadCount: { gt: 0 },
+      thread: { forumId: { in: forumIds } },
+    },
+    _count: { _all: true },
+  });
+
+  if (rows.length === 0) {
+    return result;
+  }
+
+  const threadIds = rows.map((row) => row.threadId);
+  const threads = await prisma.forumThread.findMany({
+    where: { id: { in: threadIds } },
+    select: { id: true, forumId: true },
+  });
+
+  for (const thread of threads) {
+    result.set(thread.forumId, (result.get(thread.forumId) ?? 0) + 1);
+  }
+
+  return result;
+}
+
+/**
  * Nach einer Antwort: Poster liest mit, alle anderen Watcher +1,
  * Thread-Autor wird benachrichtigt (Account-Nachricht).
  */

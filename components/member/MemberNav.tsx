@@ -96,7 +96,9 @@ export default function MemberNav() {
             {item.label}
             {showBadge && (
               <span
-                className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg"
+                className={`ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg ${
+                  item.href === "/mein-bereich/foren" ? "animate-pulse" : ""
+                }`}
                 aria-label={`${badgeCount} ungelesen`}
               >
                 {formatBadgeCount(badgeCount)}

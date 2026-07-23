@@ -25,7 +25,7 @@ import {
   describeForumReadRule,
   describeForumWriteRule,
   FORUM_PERMISSION_KIND_LABELS,
-  FORUM_READ_ACCESS_LABELS,
+  getForumAccessBadge,
 } from "./forum-labels";
 import { permissionKindFromForum } from "./forum-permission-kinds";
 import {
@@ -49,6 +49,7 @@ import {
   normalizeCreateForumInput,
   normalizeUpdateForumInput,
   validateForumCourseAssignment,
+  validateParentForumAssignment,
 } from "./forum-validation";
 
 export {
@@ -170,6 +171,7 @@ async function toForumEntry(
     requiredMembershipRole: forum.requiredMembershipRole ?? null,
     courseId: forum.courseId,
     courseTitle: forum.course?.title ?? null,
+    parentForumId: forum.parentForumId ?? null,
     isActive: forum.isActive,
     sortOrder: forum.sortOrder,
     threadCount: forumCounts.threadCount,
@@ -181,6 +183,11 @@ async function toForumEntry(
       courseTitle: forum.course?.title ?? null,
     }),
     writeRuleLabel: describeForumWriteRule(forum.writeEnabled),
+    accessBadge: getForumAccessBadge({
+      forumType: forum.forumType,
+      readAccess: forum.readAccess ?? defaultReadAccessForType(forum.forumType),
+      requiredMembershipRole: forum.requiredMembershipRole,
+    }),
     createdAt: forum.createdAt.toISOString(),
     updatedAt: forum.updatedAt.toISOString(),
   };
@@ -470,6 +477,14 @@ export async function createForum(
     return courseError;
   }
 
+  const parentError = await validateParentForumAssignment(
+    normalized.parentForumId,
+  );
+
+  if (parentError) {
+    return parentError;
+  }
+
   try {
     const slug =
       normalized.slug ||
@@ -487,6 +502,7 @@ export async function createForum(
         writeEnabled: normalized.writeEnabled,
         requiredMembershipRole: normalized.requiredMembershipRole,
         courseId: normalized.courseId,
+        parentForumId: normalized.parentForumId,
         isActive: normalized.isActive,
         sortOrder: normalized.sortOrder,
       },
@@ -514,6 +530,17 @@ export async function updateForum(
 
   const normalized = normalizedResult.data;
 
+  if (normalized.parentForumId !== undefined) {
+    const parentError = await validateParentForumAssignment(
+      normalized.parentForumId ?? null,
+      forumId,
+    );
+
+    if (parentError) {
+      return parentError;
+    }
+  }
+
   try {
     const forum = await prisma.forum.update({
       where: { id: forumId },
@@ -527,6 +554,7 @@ export async function updateForum(
         writeEnabled: normalized.writeEnabled,
         requiredMembershipRole: normalized.requiredMembershipRole,
         courseId: normalized.courseId,
+        parentForumId: normalized.parentForumId,
         isActive: normalized.isActive,
         sortOrder: normalized.sortOrder,
       },

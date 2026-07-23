@@ -1800,6 +1800,11 @@ model Forum {
   courseId String? @map("course_id") @db.Uuid
   course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
+  /// Oberforum (nullable) — Unterforen hängen hier dran
+  parentForumId String? @map("parent_forum_id") @db.Uuid
+  parentForum   Forum?  @relation("ForumHierarchy", fields: [parentForumId], references: [id], onDelete: SetNull)
+  childForums   Forum[] @relation("ForumHierarchy")
+
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")
 
@@ -1812,6 +1817,7 @@ model Forum {
   @@unique([courseId, forumPurpose])
   @@index([forumType])
   @@index([courseId])
+  @@index([parentForumId])
   @@index([isActive, sortOrder])
   @@map("forums")
 }

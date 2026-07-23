@@ -71,7 +71,9 @@ export default function MemberQuickLinks() {
               <p className="font-semibold text-aw-cream">{item.label}</p>
               {badgeCount > 0 && (
                 <span
-                  className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg"
+                  className={`inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-aw-gold px-1.5 py-0.5 text-xs font-bold text-aw-bg ${
+                    item.href === "/mein-bereich/foren" ? "animate-pulse" : ""
+                  }`}
                   aria-label={`${badgeCount} ungelesen`}
                 >
                   {formatBadgeCount(badgeCount)}

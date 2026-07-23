@@ -31,6 +31,7 @@ export type NormalizedForumInput = {
   writeEnabled: boolean;
   requiredMembershipRole: MembershipRole | null;
   courseId: string | null;
+  parentForumId: string | null;
   isActive: boolean;
   sortOrder: number;
 };
@@ -86,6 +87,12 @@ export function normalizeCreateForumInput(
     return validationError("Clubforum benötigt ein Mitgliedschaftslevel.");
   }
 
+  const parentForumId = input.parentForumId ?? null;
+
+  if (parentForumId) {
+    // Parent-Prüfung erfolgt async in createForum via validateParentForum
+  }
+
   return {
     success: true,
     data: {
@@ -98,10 +105,53 @@ export function normalizeCreateForumInput(
       writeEnabled: input.writeEnabled ?? true,
       requiredMembershipRole: fields.requiredMembershipRole,
       courseId,
+      parentForumId,
       isActive: input.isActive ?? true,
       sortOrder: input.sortOrder ?? 100,
     },
   };
+}
+
+export async function validateParentForumAssignment(
+  parentForumId: string | null,
+  forumId?: string,
+): Promise<ValidationFailure | null> {
+  if (!parentForumId) {
+    return null;
+  }
+
+  if (forumId && parentForumId === forumId) {
+    return validationError("Ein Forum kann nicht sein eigenes Oberforum sein.");
+  }
+
+  const parent = await prisma.forum.findUnique({
+    where: { id: parentForumId },
+    select: { id: true, parentForumId: true },
+  });
+
+  if (!parent) {
+    return validationError("Das gewählte Oberforum existiert nicht.");
+  }
+
+  if (parent.parentForumId) {
+    return validationError(
+      "Nur einstufige Hierarchie: Oberforen dürfen selbst keine Unterforen sein.",
+    );
+  }
+
+  if (forumId) {
+    const hasChildren = await prisma.forum.count({
+      where: { parentForumId: forumId },
+    });
+
+    if (hasChildren > 0) {
+      return validationError(
+        "Foren mit Unterforen können kein Unterforum werden.",
+      );
+    }
+  }
+
+  return null;
 }
 
 export async function validateForumCourseAssignment(
@@ -226,6 +276,10 @@ export async function normalizeUpdateForumInput(
 
   if (input.forumPurpose !== undefined) {
     normalized.forumPurpose = input.forumPurpose;
+  }
+
+  if (input.parentForumId !== undefined) {
+    normalized.parentForumId = input.parentForumId;
   }
 
   return { success: true, data: normalized };

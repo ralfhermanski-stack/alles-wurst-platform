@@ -28,6 +28,7 @@ function forumToFormValues(forum: AdminForumEntry): ForumFormValues {
     description: forum.description ?? "",
     permissionKind: forum.permissionKind,
     courseId: forum.courseId ?? "",
+    parentForumId: forum.parentForumId ?? "",
     writeEnabled: forum.writeEnabled,
     isActive: forum.isActive,
     sortOrder: forum.sortOrder,
@@ -40,6 +41,7 @@ function buildPayload(values: ForumFormValues) {
     description: values.description.trim() || null,
     permissionKind: values.permissionKind,
     courseId: values.courseId || null,
+    parentForumId: values.parentForumId || null,
     writeEnabled: values.writeEnabled,
     isActive: values.isActive,
     sortOrder: values.sortOrder,
@@ -271,6 +273,18 @@ export default function AdminForumManager() {
     return MEMBERSHIP_ROLE_LABELS[forum.requiredMembershipRole];
   }
 
+  const parentOptions = forums
+    .filter((forum) => !forum.parentForumId && forum.id !== editingForumId)
+    .map((forum) => ({ id: forum.id, title: forum.title }));
+
+  function parentTitle(forum: AdminForumEntry): string | null {
+    if (!forum.parentForumId) {
+      return null;
+    }
+
+    return forums.find((item) => item.id === forum.parentForumId)?.title ?? null;
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
       <div>
@@ -298,6 +312,7 @@ export default function AdminForumManager() {
           <AdminForumForm
             values={createForm}
             courses={courses}
+            parentOptions={parentOptions}
             submitLabel="Forum anlegen"
             onChange={setCreateForm}
             onSubmit={() => void createForum()}
@@ -312,6 +327,7 @@ export default function AdminForumManager() {
             <AdminForumForm
               values={editForm}
               courses={courses}
+              parentOptions={parentOptions}
               submitLabel="Speichern"
               onChange={setEditForm}
               onSubmit={() => void saveForumEdit()}
@@ -387,6 +403,11 @@ export default function AdminForumManager() {
                 <td className="px-4 py-3">
                   <p className="font-medium text-aw-cream">{forum.title}</p>
                   <p className="text-xs text-aw-muted">/{forum.slug}</p>
+                  {parentTitle(forum) && (
+                    <p className="mt-1 text-xs text-aw-gold/80">
+                      Unterforum von: {parentTitle(forum)}
+                    </p>
+                  )}
                   {forum.description && (
                     <p className="mt-1 text-xs text-aw-muted line-clamp-2">
                       {forum.description}
